@@ -1,0 +1,50 @@
+controlPlane:
+  distro: k8s
+  backingStore: etcd
+  statefulSet:
+    replicas: 1
+    image:
+      repository: ghcr.io/loft-sh/vcluster
+      tag: latest
+  service:
+    type: ClusterIP
+    port: 443
+
+networking:
+  serviceCIDR: 10.96.0.0/12
+  podCIDR: 10.244.0.0/16
+  networkPolicy:
+    enabled: true
+
+storage:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+sync:
+  nodes:
+    enabled: true
+  pods:
+    enabled: true
+  services:
+    enabled: true
+  configmaps:
+    enabled: true
+  secrets:
+    enabled: true
+
+policies:
+  resourceQuota:
+    enabled: false
+  limitRange:
+    enabled: false
+  networkPolicy:
+    enabled: true
+
+platform:
+  autoSleep:
+    afterInactivity: 3600
+    schedule: ""
+  autoDelete:
+    afterInactivity: 0
