@@ -3,10 +3,8 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createServer } from './server.js';
 
-// Get config file path from command line args or use default
-const configPath = process.argv[2] || '/home/decoder/loft/vcluster-config';
-
-const server = createServer(configPath);
+// Create server (no config path needed - uses GitHub)
+const server = createServer();
 
 // Start the server
 const transport = new StdioServerTransport();
