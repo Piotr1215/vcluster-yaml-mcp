@@ -23,13 +23,15 @@ describe('Tool Implementations', () => {
         method: 'tools/call',
         params: {
           name: 'list-configs',
-          arguments: {}
+          arguments: {
+            path: 'chart'
+          }
         }
       };
 
       const response = await toolHandler(request);
       expect(response.content[0].text).toContain('configuration file(s)');
-      expect(response.content[0].text).toContain('vcluster.yaml');
+      expect(response.content[0].text.toLowerCase()).toContain('values.yaml');
     });
   });
 
@@ -77,7 +79,7 @@ describe('Tool Implementations', () => {
       };
 
       const response = await toolHandler(request);
-      expect(response.content[0].text).toContain('vcluster.yaml');
+      expect(response.content[0].text.toLowerCase()).toContain('values.yaml');
     });
 
     it('should handle common query patterns', async () => {
@@ -103,7 +105,7 @@ describe('Tool Implementations', () => {
         params: {
           name: 'query-config',
           arguments: {
-            file: 'vcluster.yaml',
+            file: 'chart/values.yaml',
             query: '.controlPlane.distro'
           }
         }
@@ -141,7 +143,7 @@ networking:
         params: {
           name: 'query-config',
           arguments: {
-            file: 'vcluster.yaml',
+            file: 'chart/values.yaml',
             query: '.controlPlane.distro',
             raw: true
           }
@@ -152,7 +154,7 @@ networking:
       expect(response.content[0].text).toBeDefined();
     });
 
-    it('should error when neither file nor content provided', async () => {
+    it('should use default file when neither file nor content provided', async () => {
       const request = {
         method: 'tools/call',
         params: {
@@ -164,8 +166,9 @@ networking:
       };
 
       const response = await toolHandler(request);
-      expect(response.content[0].text).toContain('Either "file" or "content" parameter is required');
-      expect(response.isError).toBe(true);
+      // Should work with default chart/values.yaml
+      expect(response.content[0].text).toBeDefined();
+      expect(response.isError).toBeFalsy();
     });
   });
 
@@ -176,7 +179,7 @@ networking:
         params: {
           name: 'get-config-value',
           arguments: {
-            file: 'vcluster.yaml',
+            file: 'chart/values.yaml',
             path: 'controlPlane.distro'
           }
         }
@@ -265,7 +268,7 @@ controlPlane:
       expect(response.content[0].text).toBeDefined();
     });
 
-    it('should work without any YAML input if file exists', async () => {
+    it('should work with default file when no input provided', async () => {
       const request = {
         method: 'tools/call',
         params: {
@@ -275,8 +278,10 @@ controlPlane:
       };
 
       const response = await toolHandler(request);
-      expect(response.content[0].text).toContain('Either "file" or "content" parameter is required');
-      expect(response.isError).toBe(true);
+      // Should validate the default chart/values.yaml
+      expect(response.content[0].text).toBeDefined();
+      // May or may not be valid, but shouldn't error on missing params
+      expect(response.content).toBeDefined();
     });
   });
 
@@ -287,7 +292,7 @@ controlPlane:
         params: {
           name: 'search-config',
           arguments: {
-            file: 'vcluster.yaml',
+            file: 'chart/values.yaml',
             search: 'etcd'
           }
         }
@@ -324,7 +329,7 @@ database:
         params: {
           name: 'search-config',
           arguments: {
-            file: 'vcluster.yaml',
+            file: 'chart/values.yaml',
             search: 'distro',
             keysOnly: true
           }

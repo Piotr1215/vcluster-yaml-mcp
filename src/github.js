@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com';
 const REPO_OWNER = 'loft-sh';
-const REPO_NAME = 'vcluster-config';
+const REPO_NAME = 'vcluster';
 
 // Cache for fetched content (15 minute TTL)
 const cache = new Map();
@@ -157,10 +157,10 @@ class GitHubClient {
     
     // Known vcluster config files
     const configPaths = [
+      'chart/values.yaml',
+      'chart/values.schema.json',
       'config/values.yaml',
-      'vcluster.schema.json',
-      'values.schema.json',
-      'platform.schema.json'
+      'values.schema.json'
     ];
 
     for (const path of configPaths) {

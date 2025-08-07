@@ -8,7 +8,7 @@ export function createServer() {
   const server = new Server(
     {
       name: 'vcluster-yaml-mcp-server',
-      version: '0.2.0'
+      version: '0.1.0'
     },
     {
       capabilities: {
@@ -265,8 +265,8 @@ export function createServer() {
         }
 
         case 'smart-query': {
-          // Default to config/values.yaml as it contains the main vcluster configuration
-          const fileName = args.file || 'config/values.yaml';
+          // Default to chart/values.yaml as it contains the main vcluster configuration
+          const fileName = args.file || 'chart/values.yaml';
           let yamlData;
           
           try {
@@ -378,8 +378,8 @@ export function createServer() {
           } else if (args.file) {
             yamlData = await githubClient.getYamlContent(args.file, currentRef);
           } else {
-            // Default to config/values.yaml
-            yamlData = await githubClient.getYamlContent('config/values.yaml', currentRef);
+            // Default to chart/values.yaml
+            yamlData = await githubClient.getYamlContent('chart/values.yaml', currentRef);
           }
           
           // Convert YAML to JSON for jq processing
@@ -441,47 +441,107 @@ export function createServer() {
         case 'validate-config': {
           let yamlData;
           let schema;
+          const validationResults = {
+            yaml: { valid: true, errors: [] },
+            schema: { valid: true, errors: [], warnings: [] },
+            dependencies: { valid: true, errors: [], warnings: [] },
+            semantic: { valid: true, errors: [], warnings: [] }
+          };
           
-          // Load YAML data from GitHub or content
-          if (args.content) {
-            yamlData = yaml.load(args.content);
-          } else if (args.file) {
-            yamlData = await githubClient.getYamlContent(args.file, currentRef);
-          } else {
-            yamlData = await githubClient.getYamlContent('config/values.yaml', currentRef);
+          // Step 1: Validate YAML syntax
+          try {
+            if (args.content) {
+              yamlData = yaml.load(args.content);
+            } else if (args.file) {
+              yamlData = await githubClient.getYamlContent(args.file, currentRef);
+            } else {
+              yamlData = await githubClient.getYamlContent('chart/values.yaml', currentRef);
+            }
+          } catch (yamlError) {
+            validationResults.yaml.valid = false;
+            validationResults.yaml.errors.push(`YAML syntax error: ${yamlError.message}`);
+            
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `❌ YAML Validation Failed\n\nErrors:\n${validationResults.yaml.errors.join('\n')}`
+                }
+              ]
+            };
           }
           
-          // Try to load schema from GitHub
+          // Step 2: Try to load and validate against schema
           try {
-            const schemaContent = await githubClient.getFileContent('vcluster.schema.json', currentRef);
+            const schemaContent = await githubClient.getFileContent('chart/values.schema.json', currentRef);
             schema = JSON.parse(schemaContent);
           } catch (error) {
-            try {
-              // Try values.schema.json as fallback
-              const schemaContent = await githubClient.getFileContent('values.schema.json', currentRef);
-              schema = JSON.parse(schemaContent);
-            } catch (err) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: 'Schema file not found in repository. Unable to validate.'
-                  }
-                ]
-              };
-            }
+            validationResults.schema.warnings.push('Schema file not found - cannot perform schema validation');
           }
           
-          // Basic validation - check if required fields exist based on schema
-          const validation = validateAgainstSchema(yamlData, schema);
+          if (schema) {
+            const schemaValidation = validateAgainstSchema(yamlData, schema);
+            validationResults.schema.valid = schemaValidation.valid;
+            validationResults.schema.errors = schemaValidation.errors;
+            validationResults.schema.warnings = schemaValidation.warnings || [];
+          }
+          
+          // Step 3: Validate semantic rules and dependencies
+          const semanticValidation = validateSemanticRules(yamlData);
+          validationResults.semantic = semanticValidation;
+          
+          // Step 4: Generate comprehensive report
+          let report = '# vCluster Configuration Validation Report\n\n';
+          
+          // YAML Validation
+          report += '## 1. YAML Syntax\n';
+          report += validationResults.yaml.valid ? '✅ Valid YAML syntax\n\n' : '❌ Invalid YAML\n\n';
+          
+          // Schema Validation
+          report += '## 2. Schema Validation\n';
+          if (!schema) {
+            report += '⚠️ Schema validation skipped (no schema available)\n\n';
+          } else if (validationResults.schema.valid) {
+            report += '✅ Conforms to schema\n\n';
+          } else {
+            report += '❌ Schema violations found:\n';
+            validationResults.schema.errors.forEach(err => report += `- ${err}\n`);
+            report += '\n';
+          }
+          
+          // Semantic Validation
+          report += '## 3. Semantic Rules & Dependencies\n';
+          if (validationResults.semantic.valid) {
+            report += '✅ All semantic rules satisfied\n\n';
+          } else {
+            report += '❌ Semantic violations:\n';
+            validationResults.semantic.errors.forEach(err => report += `- ${err}\n`);
+            report += '\n';
+          }
+          
+          if (validationResults.semantic.warnings.length > 0) {
+            report += '⚠️ Warnings:\n';
+            validationResults.semantic.warnings.forEach(warn => report += `- ${warn}\n`);
+            report += '\n';
+          }
+          
+          // Configuration Summary
+          report += '## 4. Configuration Summary\n';
+          report += generateConfigSummary(yamlData);
+          
+          // Overall Status
+          const overallValid = validationResults.yaml.valid && 
+                              (validationResults.schema.valid || !schema) && 
+                              validationResults.semantic.valid;
+          
+          report += '\n## Overall Status\n';
+          report += overallValid ? '✅ **Configuration is valid and ready to use**' : '❌ **Configuration has errors that must be fixed**';
           
           return {
             content: [
               {
                 type: 'text',
-                text: validation.valid 
-                  ? 'Configuration is valid' 
-                  : `Validation errors:\n${validation.errors.join('\n')}`
+                text: report
               }
             ]
           };
@@ -563,12 +623,10 @@ export function createServer() {
     }
   });
 
-  // Basic schema validation function
+  // Enhanced schema validation function
   function validateAgainstSchema(data, schema) {
     const errors = [];
-    
-    // This is a simplified validation - in production, you'd use a proper JSON Schema validator
-    // For now, just check if the data structure matches expected top-level properties
+    const warnings = [];
     
     if (schema.properties) {
       for (const [key, propSchema] of Object.entries(schema.properties)) {
@@ -580,8 +638,133 @@ export function createServer() {
     
     return {
       valid: errors.length === 0,
-      errors
+      errors,
+      warnings
     };
+  }
+  
+  // Semantic rules validation
+  function validateSemanticRules(config) {
+    const errors = [];
+    const warnings = [];
+    
+    // Rule: Only one backing store can be enabled
+    if (config.controlPlane?.backingStore) {
+      const hasDatabase = config.controlPlane.backingStore.database?.embedded?.enabled || 
+                         config.controlPlane.backingStore.database?.external?.enabled;
+      const hasEtcd = config.controlPlane.backingStore.etcd?.embedded?.enabled ||
+                     config.controlPlane.backingStore.etcd?.deploy?.enabled ||
+                     config.controlPlane.backingStore.etcd?.external?.enabled;
+      
+      if (hasDatabase && hasEtcd) {
+        errors.push('Both database and etcd backing stores are enabled - only one is allowed');
+      }
+    }
+    
+    // Rule: Only one distro can be enabled
+    if (config.controlPlane?.distro) {
+      const enabledDistros = Object.keys(config.controlPlane.distro)
+        .filter(key => config.controlPlane.distro[key]?.enabled);
+      
+      if (enabledDistros.length > 1) {
+        errors.push(`Multiple distros enabled (${enabledDistros.join(', ')}) - only one is allowed`);
+      }
+      
+      if (enabledDistros.length === 0) {
+        warnings.push('No distro explicitly enabled - will use default');
+      }
+    }
+    
+    // Rule: HA requires at least 3 replicas
+    const replicas = config.controlPlane?.backingStore?.etcd?.deploy?.statefulSet?.highAvailability?.replicas;
+    if (replicas && replicas > 1 && replicas < 3) {
+      errors.push(`High availability requires at least 3 replicas (currently ${replicas})`);
+    }
+    
+    // Rule: External database requires dataSource
+    if (config.controlPlane?.backingStore?.database?.external?.enabled && 
+        !config.controlPlane.backingStore.database.external.dataSource) {
+      errors.push('External database is enabled but dataSource is not configured');
+    }
+    
+    // Rule: Namespace mappings require namespace syncing
+    if (config.sync?.toHost?.namespaces?.mappings && 
+        !config.sync.toHost.namespaces.enabled) {
+      errors.push('Namespace mappings are configured but namespace syncing is not enabled');
+    }
+    
+    // Warning: mappingsOnly without mappings
+    if (config.sync?.toHost?.namespaces?.mappingsOnly && 
+        !config.sync?.toHost?.namespaces?.mappings?.byName) {
+      warnings.push('mappingsOnly is true but no namespace mappings are defined');
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }
+  
+  // Generate configuration summary
+  function generateConfigSummary(config) {
+    const summary = [];
+    
+    // Distro
+    if (config.controlPlane?.distro) {
+      const enabled = Object.keys(config.controlPlane.distro)
+        .find(key => config.controlPlane.distro[key]?.enabled);
+      summary.push(`- **Distro**: ${enabled || 'default'}`);
+    }
+    
+    // Backing store
+    if (config.controlPlane?.backingStore) {
+      if (config.controlPlane.backingStore.database?.embedded?.enabled) {
+        summary.push('- **Storage**: Embedded database (SQLite)');
+      } else if (config.controlPlane.backingStore.database?.external?.enabled) {
+        summary.push('- **Storage**: External database');
+      } else if (config.controlPlane.backingStore.etcd?.deploy?.enabled) {
+        const replicas = config.controlPlane.backingStore.etcd.deploy.statefulSet?.highAvailability?.replicas || 1;
+        summary.push(`- **Storage**: Deployed etcd (${replicas} replica${replicas > 1 ? 's' : ''})`);
+      } else if (config.controlPlane.backingStore.etcd?.embedded?.enabled) {
+        summary.push('- **Storage**: Embedded etcd');
+      } else if (config.controlPlane.backingStore.etcd?.external?.enabled) {
+        summary.push('- **Storage**: External etcd');
+      }
+    }
+    
+    // Sync configuration
+    if (config.sync?.toHost) {
+      const syncedResources = Object.keys(config.sync.toHost)
+        .filter(key => config.sync.toHost[key]?.enabled)
+        .map(key => key.replace(/([A-Z])/g, ' $1').trim());
+      
+      if (syncedResources.length > 0) {
+        summary.push(`- **Synced to host**: ${syncedResources.join(', ')}`);
+      }
+    }
+    
+    if (config.sync?.fromHost) {
+      const syncedResources = Object.keys(config.sync.fromHost)
+        .filter(key => config.sync.fromHost[key]?.enabled)
+        .map(key => key.replace(/([A-Z])/g, ' $1').trim());
+      
+      if (syncedResources.length > 0) {
+        summary.push(`- **Synced from host**: ${syncedResources.join(', ')}`);
+      }
+    }
+    
+    // Namespace mappings
+    if (config.sync?.toHost?.namespaces?.mappings?.byName) {
+      const mappingCount = Object.keys(config.sync.toHost.namespaces.mappings.byName).length;
+      summary.push(`- **Namespace mappings**: ${mappingCount} pattern${mappingCount > 1 ? 's' : ''}`);
+      
+      if (config.sync.toHost.namespaces.mappingsOnly) {
+        summary.push('- **Strict mode**: Only mapped namespaces allowed');
+      }
+    }
+    
+    return summary.length > 0 ? summary.join('\n') : 'No configuration detected';
   }
 
   return server;
