@@ -37,12 +37,13 @@ describe('VCluster YAML MCP Server', () => {
       const response = await handler({ method: 'tools/list', params: {} });
       
       const toolNames = response.tools.map(t => t.name);
+      expect(toolNames).toContain('list-versions');
+      expect(toolNames).toContain('set-version');
+      expect(toolNames).toContain('get-current-version');
       expect(toolNames).toContain('list-configs');
       expect(toolNames).toContain('smart-query');
-      expect(toolNames).toContain('query-config');
-      expect(toolNames).toContain('get-config-value');
       expect(toolNames).toContain('validate-config');
-      expect(toolNames).toContain('search-config');
+      expect(toolNames).toContain('extract-validation-rules');
     });
 
     it('should have correct smart-query tool definition', async () => {
@@ -51,7 +52,7 @@ describe('VCluster YAML MCP Server', () => {
       
       const smartQuery = response.tools.find(t => t.name === 'smart-query');
       expect(smartQuery).toBeDefined();
-      expect(smartQuery.description).toContain('Smart search');
+      expect(smartQuery.description).toContain('UNIVERSAL SEARCH');
       expect(smartQuery.inputSchema.required).toEqual(['query']);
       expect(smartQuery.inputSchema.properties.query).toBeDefined();
       expect(smartQuery.inputSchema.properties.file).toBeDefined();
@@ -66,6 +67,18 @@ describe('VCluster YAML MCP Server', () => {
       expect(validateConfig.inputSchema.required).toEqual([]);
       expect(validateConfig.inputSchema.properties.file).toBeDefined();
       expect(validateConfig.inputSchema.properties.content).toBeDefined();
+      expect(validateConfig.inputSchema.properties.includeAiRules).toBeDefined();
+    });
+
+    it('should have extract-validation-rules tool', async () => {
+      const handler = server._requestHandlers.get('tools/list');
+      const response = await handler({ method: 'tools/list', params: {} });
+      
+      const extractRules = response.tools.find(t => t.name === 'extract-validation-rules');
+      expect(extractRules).toBeDefined();
+      expect(extractRules.description).toContain('AI ASSISTANT');
+      expect(extractRules.inputSchema.properties.file).toBeDefined();
+      expect(extractRules.inputSchema.properties.section).toBeDefined();
     });
   });
 });

@@ -26,7 +26,7 @@ export function createServer() {
       tools: [
         {
           name: 'list-versions',
-          description: 'List all available vcluster versions (GitHub tags/releases)',
+          description: 'DISCOVERY: Find all available vCluster versions. Use this FIRST when exploring versions, checking for updates, or before switching versions. Returns GitHub tags (stable releases) and branches (development versions). Shows current version at the end.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -35,7 +35,7 @@ export function createServer() {
         },
         {
           name: 'set-version',
-          description: 'Switch to a specific vcluster version (tag) or branch',
+          description: 'VERSION CONTROL: Switch the context to a specific vCluster version or branch. CRITICAL: Do this BEFORE querying configurations to ensure you\'re looking at the right version! Use after list-versions to pick a specific release. Examples: "v0.19.0" for stable, "main" for latest development.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -49,7 +49,7 @@ export function createServer() {
         },
         {
           name: 'get-current-version',
-          description: 'Get the currently selected vcluster version/branch',
+          description: 'STATUS CHECK: See which vCluster version/branch is currently active. Use this to verify context before making queries or when unsure which version you\'re working with. Always shows the ref that subsequent queries will use.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -58,7 +58,7 @@ export function createServer() {
         },
         {
           name: 'list-configs',
-          description: 'List all available vcluster YAML configuration files from GitHub',
+          description: 'FILE EXPLORER: Browse available YAML configuration files in the vCluster repository. Use when you need to discover what config files exist or find examples. Default searches "config" directory but can explore any path. Returns file paths and sizes.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -73,74 +73,25 @@ export function createServer() {
         },
         {
           name: 'smart-query',
-          description: 'Smart search for vcluster configuration information from GitHub. Just ask what you want to know! Examples: "namespaces", "etcd", "what is the service CIDR", "networking settings", etc.',
+          description: 'UNIVERSAL SEARCH: Your go-to tool for finding ANY vCluster configuration! Understands natural language, searches intelligently, and finds related settings. USE THIS FIRST for any config questions! Examples: "show me namespace settings", "how is etcd configured?", "what networking options exist?", "find service CIDR". Searches chart/values.yaml by default (the main config source).',
           inputSchema: {
             type: 'object',
             properties: {
               query: {
                 type: 'string',
-                description: 'Natural language query or search term (e.g., "namespace config", "service CIDR", "k3s", "networking")'
+                description: 'Natural language query (e.g., "namespace syncing", "high availability", "storage options")'
               },
               file: {
                 type: 'string',
-                description: 'Optional: specific file path in repo (default: "config/values.yaml")'
+                description: 'Optional: specific file to search (default: "chart/values.yaml" - the main config)'
               }
             },
             required: ['query']
-          }
-        },
-        {
-          name: 'query-config',
-          description: 'Query vcluster YAML configuration from GitHub using jq expressions.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              file: {
-                type: 'string',
-                description: 'File path in GitHub repo (e.g., "config/values.yaml"). Optional if content is provided.'
-              },
-              content: {
-                type: 'string',
-                description: 'Direct YAML content to query. Optional if file is provided.'
-              },
-              query: {
-                type: 'string',
-                description: 'jq query expression (e.g., ".controlPlane.distro", ".networking.serviceCIDR")'
-              },
-              raw: {
-                type: 'boolean',
-                description: 'Return raw output without JSON formatting (default: false)',
-                default: false
-              }
-            },
-            required: ['query']
-          }
-        },
-        {
-          name: 'get-config-value',
-          description: 'Get a specific value from vcluster configuration using dot notation path',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              file: {
-                type: 'string',
-                description: 'File path in GitHub repo. Optional if content is provided.'
-              },
-              content: {
-                type: 'string',
-                description: 'Direct YAML content to query. Optional if file is provided.'
-              },
-              path: {
-                type: 'string',
-                description: 'Dot-separated path to the value (e.g., "controlPlane.distro")'
-              }
-            },
-            required: ['path']
           }
         },
         {
           name: 'validate-config',
-          description: 'Validate vcluster YAML configuration against the vcluster schema from GitHub.',
+          description: 'VALIDATION ENGINE: Comprehensive validation of vCluster YAML configurations. Performs 3 layers of checks: 1) YAML syntax (catches parse errors), 2) Schema validation (types, required fields), 3) Procedural rules (structural conflicts, port ranges). Set includeAiRules=true to also extract semantic rules from comments for AI analysis. USE THIS to verify configs are correct before deployment!',
           inputSchema: {
             type: 'object',
             properties: {
@@ -151,36 +102,33 @@ export function createServer() {
               content: {
                 type: 'string',
                 description: 'Direct YAML content to validate. Optional if file is provided.'
+              },
+              includeAiRules: {
+                type: 'boolean',
+                description: 'Extract and include AI validation rules from YAML comments (default: false)',
+                default: false
               }
             },
             required: []
           }
         },
         {
-          name: 'search-config',
-          description: 'Search for specific keys or values in vcluster configuration from GitHub',
+          name: 'extract-validation-rules',
+          description: 'AI ASSISTANT: Extract validation rules, constraints, and best practices directly from values.yaml comments. Returns structured rules for AI to understand complex relationships and semantic validations that procedural code cannot handle. USE THIS when you need to understand the "why" behind configurations or validate semantic correctness beyond syntax.',
           inputSchema: {
             type: 'object',
             properties: {
               file: {
                 type: 'string',
-                description: 'File path in GitHub repo. Optional if content is provided.'
+                description: 'File path in GitHub repo (default: "chart/values.yaml")',
+                default: 'chart/values.yaml'
               },
-              content: {
+              section: {
                 type: 'string',
-                description: 'Direct YAML content to search. Optional if file is provided.'
-              },
-              search: {
-                type: 'string',
-                description: 'Search term to find in keys or values'
-              },
-              keysOnly: {
-                type: 'boolean',
-                description: 'Search only in keys (default: false)',
-                default: false
+                description: 'Focus on specific section (e.g., "controlPlane", "sync", "networking")'
               }
             },
-            required: ['search']
+            required: []
           }
         }
       ]
@@ -438,6 +386,35 @@ export function createServer() {
           };
         }
 
+        case 'extract-validation-rules': {
+          const fileName = args.file || 'chart/values.yaml';
+          let content;
+          
+          try {
+            content = await githubClient.getFileContent(fileName, currentRef);
+          } catch (error) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Error loading ${fileName}: ${error.message}`
+                }
+              ]
+            };
+          }
+          
+          const rules = extractValidationRulesFromComments(content, args.section);
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(rules, null, 2)
+              }
+            ]
+          };
+        }
+
         case 'validate-config': {
           let yamlData;
           let schema;
@@ -486,11 +463,22 @@ export function createServer() {
             validationResults.schema.warnings = schemaValidation.warnings || [];
           }
           
-          // Step 3: Validate semantic rules and dependencies
-          const semanticValidation = validateSemanticRules(yamlData);
-          validationResults.semantic = semanticValidation;
+          // Step 3: Validate procedural rules (deterministic checks)
+          const proceduralValidation = validateProceduralRules(yamlData);
+          validationResults.procedural = proceduralValidation;
           
-          // Step 4: Generate comprehensive report
+          // Step 4: Extract AI validation rules if requested
+          let aiRules = null;
+          if (args.includeAiRules) {
+            try {
+              const valuesContent = await githubClient.getFileContent('chart/values.yaml', currentRef);
+              aiRules = extractValidationRulesFromComments(valuesContent);
+            } catch (error) {
+              validationResults.aiRules = { error: `Could not extract AI rules: ${error.message}` };
+            }
+          }
+          
+          // Step 5: Generate comprehensive report
           let report = '# vCluster Configuration Validation Report\n\n';
           
           // YAML Validation
@@ -509,30 +497,59 @@ export function createServer() {
             report += '\n';
           }
           
-          // Semantic Validation
-          report += '## 3. Semantic Rules & Dependencies\n';
-          if (validationResults.semantic.valid) {
-            report += '✅ All semantic rules satisfied\n\n';
+          // Procedural Validation
+          report += '## 3. Procedural Rules (Structure & Logic)\n';
+          if (validationResults.procedural.valid) {
+            report += '✅ All procedural rules satisfied\n\n';
           } else {
-            report += '❌ Semantic violations:\n';
-            validationResults.semantic.errors.forEach(err => report += `- ${err}\n`);
+            report += '❌ Violations found:\n';
+            validationResults.procedural.errors.forEach(err => report += `- ${err}\n`);
             report += '\n';
           }
           
-          if (validationResults.semantic.warnings.length > 0) {
+          if (validationResults.procedural.warnings && validationResults.procedural.warnings.length > 0) {
             report += '⚠️ Warnings:\n';
-            validationResults.semantic.warnings.forEach(warn => report += `- ${warn}\n`);
+            validationResults.procedural.warnings.forEach(warn => report += `- ${warn}\n`);
             report += '\n';
+          }
+          
+          // AI Validation Rules (if requested)
+          if (aiRules) {
+            report += '## 4. AI Validation Instructions\n';
+            report += 'The following validation rules were extracted from comments for AI analysis:\n\n';
+            
+            if (aiRules.rules && aiRules.rules.length > 0) {
+              report += '### Rules to Check:\n';
+              aiRules.rules.forEach(rule => {
+                report += `**${rule.path}**:\n`;
+                rule.instructions.forEach(inst => report += `  - ${inst}\n`);
+              });
+              report += '\n';
+            }
+            
+            if (aiRules.enums) {
+              report += '### Valid Values:\n';
+              Object.entries(aiRules.enums).forEach(([field, values]) => {
+                report += `- **${field}**: ${values.join(', ')}\n`;
+              });
+              report += '\n';
+            }
+            
+            if (aiRules.dependencies) {
+              report += '### Dependencies:\n';
+              aiRules.dependencies.forEach(dep => report += `- ${dep}\n`);
+              report += '\n';
+            }
           }
           
           // Configuration Summary
-          report += '## 4. Configuration Summary\n';
+          report += `## ${aiRules ? '5' : '4'}. Configuration Summary\n`;
           report += generateConfigSummary(yamlData);
           
           // Overall Status
           const overallValid = validationResults.yaml.valid && 
                               (validationResults.schema.valid || !schema) && 
-                              validationResults.semantic.valid;
+                              validationResults.procedural.valid;
           
           report += '\n## Overall Status\n';
           report += overallValid ? '✅ **Configuration is valid and ready to use**' : '❌ **Configuration has errors that must be fixed**';
@@ -623,80 +640,383 @@ export function createServer() {
     }
   });
 
-  // Enhanced schema validation function
+  // Extract validation rules from YAML comments for AI validation
+  function extractValidationRulesFromComments(yamlContent, section) {
+    const lines = yamlContent.split('\n');
+    const rules = [];
+    const enums = {};
+    const dependencies = [];
+    const defaults = {};
+    
+    let currentPath = [];
+    let currentComments = [];
+    let indentStack = [0];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines
+      if (!trimmedLine) {
+        currentComments = [];
+        continue;
+      }
+      
+      // Collect comments
+      if (trimmedLine.startsWith('#')) {
+        const comment = trimmedLine.substring(1).trim();
+        if (comment && !comment.startsWith('#')) {
+          currentComments.push(comment);
+        }
+        continue;
+      }
+      
+      // Parse YAML structure
+      const indent = line.search(/\S/);
+      const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*(.*)?$/);
+      
+      if (keyMatch) {
+        const key = keyMatch[2];
+        const value = keyMatch[3];
+        
+        // Update path based on indentation
+        while (indentStack.length > 1 && indent <= indentStack[indentStack.length - 1]) {
+          indentStack.pop();
+          currentPath.pop();
+        }
+        
+        if (indent > indentStack[indentStack.length - 1]) {
+          indentStack.push(indent);
+        } else if (indent < indentStack[indentStack.length - 1]) {
+          while (indentStack.length > 1 && indent < indentStack[indentStack.length - 1]) {
+            indentStack.pop();
+            currentPath.pop();
+          }
+        } else {
+          currentPath.pop();
+        }
+        
+        currentPath.push(key);
+        const fullPath = currentPath.join('.');
+        
+        // Filter by section if specified
+        if (section && !fullPath.startsWith(section)) {
+          currentComments = [];
+          continue;
+        }
+        
+        // Extract validation instructions from comments
+        if (currentComments.length > 0) {
+          const instructions = [];
+          
+          for (const comment of currentComments) {
+            // Extract enum values (e.g., "Valid values: a, b, c")
+            const enumMatch = comment.match(/(?:valid values?|options?|choices?|possible values?):\s*(.+)/i);
+            if (enumMatch) {
+              const values = enumMatch[1].split(/[,;]/).map(v => v.trim()).filter(v => v);
+              enums[fullPath] = values;
+              instructions.push(`Valid values: ${values.join(', ')}`);
+            }
+            
+            // Extract required dependencies
+            if (comment.match(/requires?|depends on|needs?/i)) {
+              dependencies.push(`${fullPath}: ${comment}`);
+              instructions.push(comment);
+            }
+            
+            // Extract defaults
+            const defaultMatch = comment.match(/default(?:s)?\s*(?:is|:)?\s*(.+)/i);
+            if (defaultMatch) {
+              defaults[fullPath] = defaultMatch[1].trim();
+            }
+            
+            // Extract validation rules
+            if (comment.match(/must|should|cannot|only|at least|minimum|maximum|required/i)) {
+              instructions.push(comment);
+            }
+            
+            // Extract warnings
+            if (comment.match(/warning|note|important|deprecated/i)) {
+              instructions.push(`⚠️ ${comment}`);
+            }
+          }
+          
+          if (instructions.length > 0) {
+            rules.push({
+              path: fullPath,
+              instructions: instructions,
+              originalComments: currentComments
+            });
+          }
+        }
+        
+        currentComments = [];
+      }
+    }
+    
+    // Generate AI validation instructions
+    const aiInstructions = {
+      summary: `Extracted ${rules.length} validation rules from YAML comments`,
+      rules: rules,
+      enums: enums,
+      dependencies: dependencies,
+      defaults: defaults,
+      instructions: generateAiValidationInstructions(rules, enums, dependencies)
+    };
+    
+    return aiInstructions;
+  }
+  
+  function generateAiValidationInstructions(rules, enums, dependencies) {
+    let instructions = '### AI Validation Instructions\n\n';
+    instructions += 'Please validate the configuration using these rules extracted from comments:\n\n';
+    
+    if (rules.length > 0) {
+      instructions += '#### Field-Specific Rules:\n';
+      rules.forEach(rule => {
+        instructions += `- **${rule.path}**:\n`;
+        rule.instructions.forEach(inst => {
+          instructions += `  - ${inst}\n`;
+        });
+      });
+      instructions += '\n';
+    }
+    
+    if (Object.keys(enums).length > 0) {
+      instructions += '#### Enumeration Constraints:\n';
+      instructions += 'Ensure these fields only contain the specified values:\n';
+      Object.entries(enums).forEach(([field, values]) => {
+        instructions += `- ${field}: [${values.join(', ')}]\n`;
+      });
+      instructions += '\n';
+    }
+    
+    if (dependencies.length > 0) {
+      instructions += '#### Dependencies to Check:\n';
+      dependencies.forEach(dep => {
+        instructions += `- ${dep}\n`;
+      });
+      instructions += '\n';
+    }
+    
+    instructions += '#### Validation Approach:\n';
+    instructions += '1. Check if all enumeration constraints are satisfied\n';
+    instructions += '2. Verify all dependency requirements are met\n';
+    instructions += '3. Validate against the specific rules for each field\n';
+    instructions += '4. Flag any deprecated fields or configurations\n';
+    instructions += '5. Provide helpful suggestions for fixing any issues found\n';
+    
+    return instructions;
+  }
+  
+  // Procedural validation - deterministic checks only
+  function validateProceduralRules(config) {
+    const errors = [];
+    const warnings = [];
+    
+    // RULE 1: Only one backing store can be enabled (deterministic)
+    if (config.controlPlane?.backingStore) {
+      const backingStores = [];
+      
+      if (config.controlPlane.backingStore.database?.embedded?.enabled) {
+        backingStores.push('database.embedded');
+      }
+      if (config.controlPlane.backingStore.database?.external?.enabled) {
+        backingStores.push('database.external');
+      }
+      if (config.controlPlane.backingStore.etcd?.embedded?.enabled) {
+        backingStores.push('etcd.embedded');
+      }
+      if (config.controlPlane.backingStore.etcd?.deploy?.enabled) {
+        backingStores.push('etcd.deploy');
+      }
+      if (config.controlPlane.backingStore.etcd?.external?.enabled) {
+        backingStores.push('etcd.external');
+      }
+      
+      if (backingStores.length > 1) {
+        errors.push(`Multiple backing stores enabled: ${backingStores.join(', ')}. Only one is allowed.`);
+      }
+    }
+    
+    // RULE 2: Only one distro can be enabled (deterministic)
+    if (config.controlPlane?.distro) {
+      const enabledDistros = Object.keys(config.controlPlane.distro)
+        .filter(key => config.controlPlane.distro[key]?.enabled === true);
+      
+      if (enabledDistros.length > 1) {
+        errors.push(`Multiple distros enabled: ${enabledDistros.join(', ')}. Only one is allowed.`);
+      }
+    }
+    
+    // RULE 3: Negative numbers validation (deterministic)
+    function checkNegativeNumbers(obj, path = '') {
+      if (obj && typeof obj === 'object') {
+        for (const [key, value] of Object.entries(obj)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          
+          if (typeof value === 'number' && value < 0) {
+            // Check if it's a field that shouldn't be negative
+            if (key.toLowerCase().includes('replica') ||
+                key.toLowerCase().includes('count') ||
+                key.toLowerCase().includes('size') ||
+                key.toLowerCase().includes('port') ||
+                key.toLowerCase().includes('timeout')) {
+              errors.push(`Invalid negative value at ${currentPath}: ${value}`);
+            }
+          } else if (typeof value === 'object' && value !== null) {
+            checkNegativeNumbers(value, currentPath);
+          }
+        }
+      }
+    }
+    checkNegativeNumbers(config);
+    
+    // RULE 4: Required field dependencies (deterministic)
+    if (config.controlPlane?.backingStore?.database?.external?.enabled && 
+        !config.controlPlane.backingStore.database.external.dataSource) {
+      errors.push('External database enabled but dataSource is not configured');
+    }
+    
+    if (config.controlPlane?.backingStore?.etcd?.external?.enabled && 
+        !config.controlPlane.backingStore.etcd.external.endpoints) {
+      errors.push('External etcd enabled but endpoints are not configured');
+    }
+    
+    // RULE 5: Logical consistency checks (deterministic)
+    if (config.sync?.toHost?.namespaces?.mappingsOnly === true && 
+        (!config.sync?.toHost?.namespaces?.mappings || 
+         Object.keys(config.sync.toHost.namespaces.mappings).length === 0)) {
+      warnings.push('mappingsOnly is true but no namespace mappings are defined');
+    }
+    
+    // RULE 6: Network policy conflicts (deterministic)
+    if (config.sync?.toHost?.networkPolicies?.enabled === true && 
+        config.sync?.toHost?.namespaces?.enabled === true) {
+      errors.push('NetworkPolicies cannot be synced when namespace syncing is enabled');
+    }
+    
+    // RULE 7: Type validation for boolean fields (deterministic)
+    function checkBooleanFields(obj, path = '') {
+      if (obj && typeof obj === 'object') {
+        for (const [key, value] of Object.entries(obj)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          
+          if (key === 'enabled' && typeof value !== 'boolean' && value !== undefined) {
+            errors.push(`Field '${currentPath}' should be boolean, got ${typeof value}`);
+          } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            checkBooleanFields(value, currentPath);
+          }
+        }
+      }
+    }
+    checkBooleanFields(config);
+    
+    // RULE 8: Port range validation (deterministic)
+    function checkPortRanges(obj, path = '') {
+      if (obj && typeof obj === 'object') {
+        for (const [key, value] of Object.entries(obj)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          
+          if (key.toLowerCase().includes('port') && typeof value === 'number') {
+            if (value < 1 || value > 65535) {
+              errors.push(`Invalid port number at ${currentPath}: ${value} (must be 1-65535)`);
+            }
+          } else if (typeof value === 'object' && value !== null) {
+            checkPortRanges(value, currentPath);
+          }
+        }
+      }
+    }
+    checkPortRanges(config);
+    
+    return {
+      valid: errors.length === 0,
+      errors: errors,
+      warnings: warnings
+    };
+  }
+  
+  // JSON Schema validation - purely structural/type checks
   function validateAgainstSchema(data, schema) {
     const errors = [];
     const warnings = [];
     
-    if (schema.properties) {
-      for (const [key, propSchema] of Object.entries(schema.properties)) {
-        if (propSchema.required && !(key in data)) {
-          errors.push(`Missing required property: ${key}`);
+    // Recursive validation function for JSON schema
+    function validateObject(obj, objSchema, path = '') {
+      if (!obj || !objSchema) return;
+      
+      // Check required properties
+      if (objSchema.required && Array.isArray(objSchema.required)) {
+        for (const requiredProp of objSchema.required) {
+          if (!(requiredProp in obj)) {
+            errors.push(`Missing required property: ${path ? path + '.' : ''}${requiredProp}`);
+          }
+        }
+      }
+      
+      // Validate each property
+      if (objSchema.properties) {
+        for (const [key, value] of Object.entries(obj)) {
+          const propSchema = objSchema.properties[key];
+          const currentPath = path ? `${path}.${key}` : key;
+          
+          if (!propSchema) continue;
+          
+          // Type validation
+          if (propSchema.type) {
+            const expectedType = Array.isArray(propSchema.type) ? propSchema.type : [propSchema.type];
+            const actualType = Array.isArray(value) ? 'array' : typeof value;
+            
+            if (!expectedType.includes(actualType)) {
+              errors.push(`Invalid type at ${currentPath}: expected ${expectedType.join(' or ')}, got ${actualType}`);
+            }
+          }
+          
+          // Numeric range validation from schema
+          if (typeof value === 'number') {
+            if (propSchema.minimum !== undefined && value < propSchema.minimum) {
+              errors.push(`Value at ${currentPath} is below minimum (${value} < ${propSchema.minimum})`);
+            }
+            if (propSchema.maximum !== undefined && value > propSchema.maximum) {
+              errors.push(`Value at ${currentPath} exceeds maximum (${value} > ${propSchema.maximum})`);
+            }
+          }
+          
+          // Enum validation from schema
+          if (propSchema.enum && !propSchema.enum.includes(value)) {
+            const suggestion = propSchema.enum.join(', ');
+            errors.push(`Invalid value at ${currentPath}: "${value}" is not one of [${suggestion}]`);
+          }
+          
+          // Pattern validation from schema
+          if (propSchema.pattern && typeof value === 'string') {
+            const regex = new RegExp(propSchema.pattern);
+            if (!regex.test(value)) {
+              errors.push(`Value at ${currentPath} doesn't match pattern: ${propSchema.pattern}`);
+            }
+          }
+          
+          // Recursive validation for nested objects
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            validateObject(value, propSchema, currentPath);
+          }
+          
+          // Array validation
+          if (Array.isArray(value) && propSchema.items) {
+            value.forEach((item, index) => {
+              if (typeof item === 'object' && item !== null) {
+                validateObject(item, propSchema.items, `${currentPath}[${index}]`);
+              }
+            });
+          }
         }
       }
     }
     
-    return {
-      valid: errors.length === 0,
-      errors,
-      warnings
-    };
-  }
-  
-  // Semantic rules validation
-  function validateSemanticRules(config) {
-    const errors = [];
-    const warnings = [];
-    
-    // Rule: Only one backing store can be enabled
-    if (config.controlPlane?.backingStore) {
-      const hasDatabase = config.controlPlane.backingStore.database?.embedded?.enabled || 
-                         config.controlPlane.backingStore.database?.external?.enabled;
-      const hasEtcd = config.controlPlane.backingStore.etcd?.embedded?.enabled ||
-                     config.controlPlane.backingStore.etcd?.deploy?.enabled ||
-                     config.controlPlane.backingStore.etcd?.external?.enabled;
-      
-      if (hasDatabase && hasEtcd) {
-        errors.push('Both database and etcd backing stores are enabled - only one is allowed');
-      }
-    }
-    
-    // Rule: Only one distro can be enabled
-    if (config.controlPlane?.distro) {
-      const enabledDistros = Object.keys(config.controlPlane.distro)
-        .filter(key => config.controlPlane.distro[key]?.enabled);
-      
-      if (enabledDistros.length > 1) {
-        errors.push(`Multiple distros enabled (${enabledDistros.join(', ')}) - only one is allowed`);
-      }
-      
-      if (enabledDistros.length === 0) {
-        warnings.push('No distro explicitly enabled - will use default');
-      }
-    }
-    
-    // Rule: HA requires at least 3 replicas
-    const replicas = config.controlPlane?.backingStore?.etcd?.deploy?.statefulSet?.highAvailability?.replicas;
-    if (replicas && replicas > 1 && replicas < 3) {
-      errors.push(`High availability requires at least 3 replicas (currently ${replicas})`);
-    }
-    
-    // Rule: External database requires dataSource
-    if (config.controlPlane?.backingStore?.database?.external?.enabled && 
-        !config.controlPlane.backingStore.database.external.dataSource) {
-      errors.push('External database is enabled but dataSource is not configured');
-    }
-    
-    // Rule: Namespace mappings require namespace syncing
-    if (config.sync?.toHost?.namespaces?.mappings && 
-        !config.sync.toHost.namespaces.enabled) {
-      errors.push('Namespace mappings are configured but namespace syncing is not enabled');
-    }
-    
-    // Warning: mappingsOnly without mappings
-    if (config.sync?.toHost?.namespaces?.mappingsOnly && 
-        !config.sync?.toHost?.namespaces?.mappings?.byName) {
-      warnings.push('mappingsOnly is true but no namespace mappings are defined');
+    // Run recursive validation if schema is provided
+    if (schema) {
+      validateObject(data, schema);
     }
     
     return {
