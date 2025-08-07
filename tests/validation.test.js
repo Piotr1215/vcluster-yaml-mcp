@@ -46,10 +46,12 @@ controlPlane:
         }
       });
       
-      // Check for failure, not specific text
-      expect(response.content[0].text).toBeDefined();
-      expect(response.content[0].text.includes('✅ **Configuration is valid')).toBe(false);
-      expect(response.content[0].text.includes('❌')).toBe(true);
+      // Parse JSON response
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.procedural.valid).toBe(false);
+      expect(result.layers.procedural.errors.length).toBeGreaterThan(0);
+      expect(result.severity.errors).toBeGreaterThan(0);
+      expect(result.overall_status).toContain('FAILED');
     });
 
     it('should pass when only one backing store is enabled', async () => {
@@ -72,8 +74,10 @@ controlPlane:
         }
       });
       
-      // Should not have procedural violations
-      expect(response.content[0].text.includes('✅ All procedural rules satisfied')).toBe(true);
+      const result = JSON.parse(response.content[0].text);
+      // Should not have procedural violations for backing stores
+      expect(result.layers.procedural.valid).toBe(true);
+      expect(result.layers.procedural.errors.length).toBe(0);
     });
 
     it('should fail when multiple distros are enabled', async () => {
@@ -94,8 +98,10 @@ controlPlane:
         }
       });
       
-      expect(response.content[0].text.includes('❌')).toBe(true);
-      expect(response.content[0].text.includes('✅ **Configuration is valid')).toBe(false);
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.procedural.valid).toBe(false);
+      expect(result.layers.procedural.errors.length).toBeGreaterThan(0);
+      expect(result.severity.errors).toBeGreaterThan(0);
     });
 
     it('should reject negative numeric values for specific fields', async () => {
@@ -114,7 +120,9 @@ controlPlane:
         }
       });
       
-      expect(response.content[0].text.includes('❌')).toBe(true);
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.procedural.valid).toBe(false);
+      expect(result.layers.procedural.errors.length).toBeGreaterThan(0);
     });
 
     it('should reject port numbers outside valid range', async () => {
@@ -133,7 +141,9 @@ controlPlane:
         }
       });
       
-      expect(responseTooHigh.content[0].text.includes('❌')).toBe(true);
+      const resultHigh = JSON.parse(responseTooHigh.content[0].text);
+      expect(resultHigh.layers.procedural.valid).toBe(false);
+      expect(resultHigh.layers.procedural.errors.length).toBeGreaterThan(0);
 
       const configTooLow = `
 controlPlane:
@@ -150,7 +160,9 @@ controlPlane:
         }
       });
       
-      expect(responseTooLow.content[0].text.includes('❌')).toBe(true);
+      const resultLow = JSON.parse(responseTooLow.content[0].text);
+      expect(resultLow.layers.procedural.valid).toBe(false);
+      expect(resultLow.layers.procedural.errors.length).toBeGreaterThan(0);
     });
 
     it('should accept valid port numbers', async () => {
@@ -169,7 +181,9 @@ controlPlane:
         }
       });
       
-      expect(response.content[0].text.includes('✅ All procedural rules satisfied')).toBe(true);
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.procedural.valid).toBe(true);
+      expect(result.layers.procedural.errors.length).toBe(0);
     });
 
     it('should enforce boolean type for enabled fields', async () => {
@@ -188,7 +202,9 @@ sync:
         }
       });
       
-      expect(response.content[0].text.includes('❌')).toBe(true);
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.procedural.valid).toBe(false);
+      expect(result.layers.procedural.errors.length).toBeGreaterThan(0);
     });
 
     it('should detect conflicting sync configurations', async () => {
@@ -209,7 +225,9 @@ sync:
         }
       });
       
-      expect(response.content[0].text.includes('❌')).toBe(true);
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.procedural.valid).toBe(false);
+      expect(result.layers.procedural.errors.length).toBeGreaterThan(0);
     });
 
     it('should handle YAML syntax errors', async () => {
@@ -227,8 +245,10 @@ this is not valid yaml:
         }
       });
       
-      expect(response.content[0].text.includes('❌ YAML Validation Failed')).toBe(true);
-      expect(response.content[0].text.includes('✅')).toBe(false);
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.syntax.valid).toBe(false);
+      expect(result.layers.syntax.errors.length).toBeGreaterThan(0);
+      expect(result.overall_status).toContain('FAILED');
     });
   });
 
@@ -400,18 +420,30 @@ controlPlane:
         }
       });
       
-      // AI rules should be included in the report
-      const hasAiSection = response.content[0].text.includes('## 4. AI Validation Instructions');
-      expect(hasAiSection).toBe(true);
+      // Response should be JSON with semantic layer populated
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.semantic).toBeDefined();
+      expect(result.layers.semantic.extracted).toBeGreaterThan(0);
+      expect(result.layers.semantic.rules.length).toBeGreaterThan(0);
     });
 
-    it('should not include AI rules by default', async () => {
+    it('should always extract AI rules by default', async () => {
       const config = `
 controlPlane:
   distro:
     k3s:
       enabled: true
 `;
+
+      const yamlWithComments = `
+controlPlane:
+  # Valid values: k3s, k0s, k8s
+  distro:
+    k3s:
+      enabled: true
+`;
+      
+      githubClient.getFileContent.mockResolvedValue(yamlWithComments);
       
       const response = await handler({
         method: 'tools/call',
@@ -421,9 +453,11 @@ controlPlane:
         }
       });
       
-      // AI rules should NOT be included
-      const hasAiSection = response.content[0].text.includes('AI Validation Instructions');
-      expect(hasAiSection).toBe(false);
+      // Semantic layer should have extracted rules (always extracted now)
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.semantic).toBeDefined();
+      expect(result.layers.semantic.extracted).toBeGreaterThan(0);
+      expect(result.layers.semantic.rules.length).toBeGreaterThan(0);
     });
 
     it('should handle AI rules extraction error gracefully', async () => {
@@ -448,11 +482,14 @@ controlPlane:
         }
       });
       
-      // Should still return validation results
-      expect(response.content[0].text).toBeDefined();
-      // Should have basic validation sections
-      expect(response.content[0].text.includes('YAML Syntax')).toBe(true);
-      expect(response.content[0].text.includes('Procedural Rules')).toBe(true);
+      // Should still return validation results in JSON format
+      const result = JSON.parse(response.content[0].text);
+      expect(result.layers.syntax).toBeDefined();
+      expect(result.layers.procedural).toBeDefined();
+      expect(result.layers.semantic).toBeDefined();
+      // Semantic layer should be empty due to error
+      expect(result.layers.semantic.extracted).toBe(0);
+      expect(result.layers.semantic.rules.length).toBe(0);
     });
   });
 
@@ -487,11 +524,13 @@ sync:
         }
       });
       
-      const text = response.content[0].text;
+      const result = JSON.parse(response.content[0].text);
       // Should pass all validations
-      expect(text.includes('✅ Valid YAML syntax')).toBe(true);
-      expect(text.includes('✅ All procedural rules satisfied')).toBe(true);
-      expect(text.includes('✅ **Configuration is valid and ready to use**')).toBe(true);
+      expect(result.layers.syntax.valid).toBe(true);
+      expect(result.layers.procedural.valid).toBe(true);
+      expect(result.overall_status).toContain('PASSED');
+      expect(result.severity.errors).toBe(0);
+      // May have warnings from AI rules extraction
     });
 
     it('should generate configuration summary for valid config', async () => {
@@ -517,11 +556,14 @@ controlPlane:
         }
       });
       
-      const text = response.content[0].text;
-      // Should have configuration summary
-      expect(text.includes('Configuration Summary')).toBe(true);
-      expect(text.includes('k3s')).toBe(true);
-      expect(text.includes('5 replicas')).toBe(true);
+      const result = JSON.parse(response.content[0].text);
+      // Should have valid configuration with next steps
+      expect(result.overall_status).toContain('PASSED');
+      expect(result.next_steps).toBeDefined();
+      expect(Array.isArray(result.next_steps)).toBe(true);
+      // Check that configuration was properly parsed
+      expect(result.layers.syntax.valid).toBe(true);
+      expect(result.layers.procedural.valid).toBe(true);
     });
   });
 });

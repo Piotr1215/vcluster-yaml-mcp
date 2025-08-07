@@ -67,7 +67,7 @@ describe('VCluster YAML MCP Server', () => {
       expect(validateConfig.inputSchema.required).toEqual([]);
       expect(validateConfig.inputSchema.properties.file).toBeDefined();
       expect(validateConfig.inputSchema.properties.content).toBeDefined();
-      expect(validateConfig.inputSchema.properties.includeAiRules).toBeDefined();
+      // includeAiRules removed - validation always includes all layers now
     });
 
     it('should have extract-validation-rules tool', async () => {
