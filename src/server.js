@@ -513,21 +513,36 @@ export function createServer() {
               
               // Filter rules to only those relevant to user's config
               const relevantRules = allRules.rules.filter(rule => {
-                // Check if rule path matches or is parent/child of any user path
+                // Normalize rule path for comparison
+                const rulePath = rule.path;
+                const normalizedRulePath = normalizePath(rulePath);
+                
+                // Check if rule path matches any user path
                 return userPaths.some(userPath => {
-                  const rulePath = rule.path;
+                  const normalizedUserPath = normalizePath(userPath);
+                  
                   // Match if paths are related (parent, child, or same)
+                  // Check both normalized and original paths
                   return userPath.startsWith(rulePath) || 
                          rulePath.startsWith(userPath) ||
-                         userPath === rulePath;
+                         userPath === rulePath ||
+                         normalizedUserPath.startsWith(normalizedRulePath) ||
+                         normalizedRulePath.startsWith(normalizedUserPath) ||
+                         normalizedUserPath === normalizedRulePath;
                 });
               });
               
               // Filter enums to only relevant paths
               const relevantEnums = {};
               Object.keys(allRules.enums).forEach(path => {
-                if (userPaths.some(userPath => 
-                  userPath.startsWith(path) || path.startsWith(userPath))) {
+                const normalizedEnumPath = normalizePath(path);
+                if (userPaths.some(userPath => {
+                  const normalizedUserPath = normalizePath(userPath);
+                  return userPath.startsWith(path) || 
+                         path.startsWith(userPath) ||
+                         normalizedUserPath.startsWith(normalizedEnumPath) ||
+                         normalizedEnumPath.startsWith(normalizedUserPath);
+                })) {
                   relevantEnums[path] = allRules.enums[path];
                 }
               });
@@ -661,27 +676,61 @@ export function createServer() {
     }
   });
 
+  // Normalize paths by removing array indices and wildcards
+  function normalizePath(path) {
+    return path
+      .replace(/\[\d+\]/g, '')           // Remove array indices: "foo[0]" -> "foo"
+      .replace(/\["[^"]+"\]/g, '')        // Remove bracket notation: '["key"]' -> ''
+      .replace(/\.\*[^.]*/g, '')          // Remove wildcard segments: ".customer-*" -> ""
+      .replace(/\.$/, '');                // Remove trailing dots
+  }
+
   // Extract all paths from a YAML object
   function extractPathsFromYaml(obj, prefix = '') {
-    const paths = [];
+    const paths = new Set(); // Use Set to avoid duplicates
     
     function traverse(current, currentPath) {
       if (!current || typeof current !== 'object') {
         return;
       }
       
-      Object.keys(current).forEach(key => {
-        const newPath = currentPath ? `${currentPath}.${key}` : key;
-        paths.push(newPath);
-        
-        if (current[key] && typeof current[key] === 'object') {
-          traverse(current[key], newPath);
+      // Add the current path
+      if (currentPath) {
+        paths.add(currentPath);
+        // Also add normalized version for matching
+        const normalized = normalizePath(currentPath);
+        if (normalized !== currentPath) {
+          paths.add(normalized);
         }
-      });
+      }
+      
+      if (Array.isArray(current)) {
+        // For arrays, add both the array path and indexed paths
+        current.forEach((item, index) => {
+          const indexPath = `${currentPath}[${index}]`;
+          paths.add(indexPath);
+          if (item && typeof item === 'object') {
+            traverse(item, indexPath);
+          }
+        });
+        // Also add the non-indexed path for array matching
+        paths.add(currentPath);
+      } else {
+        Object.keys(current).forEach(key => {
+          const newPath = currentPath ? `${currentPath}.${key}` : key;
+          
+          if (current[key] && typeof current[key] === 'object') {
+            traverse(current[key], newPath);
+          } else {
+            // Add leaf paths
+            paths.add(newPath);
+          }
+        });
+      }
     }
     
     traverse(obj, prefix);
-    return paths;
+    return Array.from(paths);
   }
 
   // Extract validation rules from YAML comments for AI validation
