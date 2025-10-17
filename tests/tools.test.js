@@ -17,21 +17,31 @@ describe('Tool Implementations', () => {
     toolHandler = server._requestHandlers.get('tools/call');
   });
 
-  describe('list-configs tool', () => {
-    it('should list available YAML files', async () => {
+  describe('list-versions tool', () => {
+    it('should return main branch and versions starting with v', async () => {
       const request = {
         method: 'tools/call',
         params: {
-          name: 'list-configs',
-          arguments: {
-            path: 'chart'
-          }
+          name: 'list-versions',
+          arguments: {}
         }
       };
 
       const response = await toolHandler(request);
-      expect(response.content[0].text).toContain('configuration file(s)');
-      expect(response.content[0].text.toLowerCase()).toContain('values.yaml');
+      const text = response.content[0].text;
+
+      // Should include 'main' branch
+      expect(text).toContain('- main');
+
+      // Should include versions starting with 'v'
+      expect(text).toMatch(/- v\d+\.\d+/);
+
+      // Should NOT include other branches (no 'release' or 'develop' without 'v' prefix)
+      const lines = text.split('\n').filter(line => line.startsWith('- '));
+      const invalidVersions = lines.filter(line =>
+        !line.includes('- main') && !line.match(/- v\d/)
+      );
+      expect(invalidVersions).toHaveLength(0);
     });
   });
 
@@ -230,6 +240,56 @@ items:
 
       const response = await toolHandler(request);
       expect(response.content[0].text).toContain('second');
+    });
+  });
+
+  describe('create-vcluster-config tool', () => {
+    it('should create and validate a valid config', async () => {
+      const yamlContent = `
+controlPlane:
+  backingStore:
+    etcd:
+      embedded:
+        enabled: true
+`;
+      const request = {
+        method: 'tools/call',
+        params: {
+          name: 'create-vcluster-config',
+          arguments: {
+            yaml_content: yamlContent,
+            description: 'Test config with embedded etcd'
+          }
+        }
+      };
+
+      const response = await toolHandler(request);
+      expect(response.content[0].text).toContain('✅');
+      expect(response.content[0].text).toContain('Configuration validated successfully');
+      expect(response.content[0].text).toContain('controlPlane');
+    });
+
+    it('should report validation errors for invalid config', async () => {
+      const yamlContent = `
+controlPlane:
+  distro:
+    k3s:
+      enabled: "not a boolean"
+`;
+      const request = {
+        method: 'tools/call',
+        params: {
+          name: 'create-vcluster-config',
+          arguments: {
+            yaml_content: yamlContent
+          }
+        }
+      };
+
+      const response = await toolHandler(request);
+      expect(response.content[0].text).toContain('❌');
+      expect(response.content[0].text).toContain('Validation');
+      expect(response.isError).toBe(true);
     });
   });
 

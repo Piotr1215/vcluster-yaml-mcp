@@ -35,15 +35,19 @@ describe('VCluster YAML MCP Server', () => {
     it('should define all expected tools', async () => {
       const handler = server._requestHandlers.get('tools/list');
       const response = await handler({ method: 'tools/list', params: {} });
-      
+
       const toolNames = response.tools.map(t => t.name);
       expect(toolNames).toContain('list-versions');
-      expect(toolNames).toContain('set-version');
-      expect(toolNames).toContain('get-current-version');
-      expect(toolNames).toContain('list-configs');
       expect(toolNames).toContain('smart-query');
       expect(toolNames).toContain('validate-config');
       expect(toolNames).toContain('extract-validation-rules');
+      expect(toolNames).toContain('create-vcluster-config');
+      // Removed: set-version, get-current-version (stateless), list-configs, get-config-metadata, get-schema (confusing/overlapping)
+      expect(toolNames).not.toContain('set-version');
+      expect(toolNames).not.toContain('get-current-version');
+      expect(toolNames).not.toContain('list-configs');
+      expect(toolNames).not.toContain('get-config-metadata');
+      expect(toolNames).not.toContain('get-schema');
     });
 
     it('should have correct smart-query tool definition', async () => {

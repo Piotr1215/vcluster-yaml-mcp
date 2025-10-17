@@ -13,7 +13,6 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 class GitHubClient {
   constructor() {
     this.defaultBranch = 'main';
-    this.currentRef = 'main'; // Can be branch or tag
   }
 
   // Get list of available tags (versions)
@@ -75,8 +74,8 @@ class GitHubClient {
   }
 
   // Get file content from GitHub
-  async getFileContent(path, ref = null) {
-    const actualRef = ref || this.currentRef;
+  async getFileContent(path, ref = 'main') {
+    const actualRef = ref;
     const cacheKey = `file:${actualRef}:${path}`;
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
@@ -114,43 +113,6 @@ class GitHubClient {
     }
   }
 
-  // List files in a directory
-  async listFiles(path = '', ref = null) {
-    const actualRef = ref || this.currentRef;
-    const cacheKey = `dir:${actualRef}:${path}`;
-    const cached = this.getFromCache(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const url = `${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?ref=${actualRef}`;
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'vcluster-yaml-mcp-server'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.statusText}`);
-      }
-
-      const contents = await response.json();
-      const files = contents
-        .filter(item => item.type === 'file' && (item.name.endsWith('.yaml') || item.name.endsWith('.yml')))
-        .map(item => ({
-          name: item.name,
-          path: item.path,
-          size: item.size
-        }));
-      
-      this.setCache(cacheKey, files);
-      return files;
-    } catch (error) {
-      console.error('Error listing files:', error);
-      return [];
-    }
-  }
-
   // Get vcluster configuration files
   async getVClusterConfigs(ref = null) {
     const configs = {};
@@ -178,13 +140,6 @@ class GitHubClient {
     }
 
     return configs;
-  }
-
-  // Switch to a different ref (branch or tag)
-  setRef(ref) {
-    this.currentRef = ref;
-    // Clear cache when switching refs
-    this.clearCache();
   }
 
   // Cache helpers

@@ -8,7 +8,7 @@ This MCP server provides AI assistants with tools to:
 - Query vCluster configuration options and schemas
 - Validate YAML configurations
 - Search for specific settings using natural language
-- Switch between different vCluster versions
+- Query any version with explicit version parameters (stateless)
 - Extract validation rules from comments
 
 **Key feature:** No local files needed. All data is fetched live from the vCluster GitHub repository.
@@ -18,9 +18,10 @@ This MCP server provides AI assistants with tools to:
 The server uses the GitHub API to fetch vCluster YAML configurations, schemas, and documentation directly from the source:
 
 1. **GitHub as Source of Truth**: Queries `github.com/loft-sh/vcluster` repository
-2. **Version Control**: Can switch between any tag (e.g., `v0.19.0`) or branch (e.g., `main`)
-3. **Live Data**: Always fetches the latest configuration for the selected version
-4. **Smart Caching**: 15-minute in-memory cache to avoid overloading GitHub API
+2. **Stateless Version Queries**: Every tool accepts an optional `version` parameter (e.g., `v0.19.0`, `main`)
+3. **Parallel Version Support**: Query multiple versions simultaneously without state conflicts
+4. **Live Data**: Always fetches the latest configuration for the requested version
+5. **Smart Caching**: 15-minute in-memory cache to avoid overloading GitHub API
 
 ```mermaid
 graph LR
@@ -66,7 +67,7 @@ Use the public instance (always running latest version):
 
 ## Available Tools
 
-### Version Management
+### Version Discovery
 
 **list-versions** - Browse all available vCluster versions
 ```javascript
@@ -74,77 +75,86 @@ Use the public instance (always running latest version):
 // Example output: v0.19.0, v0.20.0, main, etc.
 ```
 
-**set-version** - Switch to a specific version
-```javascript
-set-version --ref="v0.19.0"  // Stable release
-set-version --ref="main"      // Latest development
-```
-
-**get-current-version** - Check which version is active
-```javascript
-// Returns: Currently using: v0.19.0
-```
-
 ### Configuration Queries
+
+All query tools accept an optional `version` parameter (defaults to "main"):
 
 **smart-query** - Universal search using dot notation or natural language
 ```javascript
-smart-query --query="controlPlane.ingress.enabled"
-smart-query --query="namespace syncing"
-smart-query --query="etcd"
-// Returns: Matching configuration paths and their values
+smart-query --query="controlPlane.ingress.enabled" --version="v0.19.0"
+smart-query --query="namespace syncing" --version="main"
+smart-query --query="etcd"  // Defaults to "main"
+// Returns: Matching configuration paths and their values with version info
 ```
 
-**list-configs** - Browse available YAML files
+### Config Creation & Validation
+
+All validation tools accept an optional `version` parameter (defaults to "main"):
+
+**create-vcluster-config** - Create and validate configs in one step (PRIMARY TOOL)
 ```javascript
-list-configs --path="config"  // Default
-list-configs --path="chart"   // Helm chart configs
-// Returns: File paths and sizes
+// Claude uses this when generating configs for you
+// Ensures every generated config is validated before you see it
+create-vcluster-config --yaml_content="<generated-yaml>" --description="Node sync config" --version="v0.24.0"
+
+// Returns:
+// ✅ Configuration validated successfully!
+// Version: v0.24.0
+// Section: sync
+// Validation time: 45ms
+//
+// ### Configuration:
+// [your YAML here]
 ```
 
-### Validation & Schema
-
-**validate-config** - Check YAML syntax and structure
+**validate-config** - Validate existing YAML configs
 ```javascript
-validate-config --content="<yaml>"
-// Returns: { syntax_valid: true, config_paths: [...], validation_data: {...} }
+// Validate user-provided configs against specific version
+validate-config --content="<your-yaml>" --version="v0.24.0"
 
-validate-config --file="chart/values.yaml"
-// Validates a specific file from GitHub
-```
+// Validate files from GitHub
+validate-config --file="chart/values.yaml" --version="main"
 
-**get-schema** - Fetch JSON Schema for vCluster
-```javascript
-get-schema                           // Top-level overview
-get-schema --section="controlPlane"  // Specific section
-get-schema --path="sync.toHost"      // Nested path
-// Returns: JSON Schema for the specified section
+// Works with full configs or partial snippets (auto-detects section)
+// Returns: { valid: true/false, errors: [...], section: "...", version: "...", elapsed_ms: <100 }
 ```
 
 **extract-validation-rules** - Get validation rules from YAML comments
 ```javascript
-extract-validation-rules --section="controlPlane"
+extract-validation-rules --section="controlPlane" --version="v0.24.0"
 // Returns: { rules, enums, dependencies, defaults }
 // Extracts constraints like "Valid values: a, b, c"
 ```
 
-**get-config-metadata** - Full configuration metadata
-```javascript
-get-config-metadata --file="chart/values.yaml"
-// Returns: { fields, tree_structure, comments, types }
-```
-
 ## Usage Examples
 
-### Validate a Custom Configuration
+### Interactive Config Creation (Primary Workflow)
 
 Ask Claude:
-> "Can you validate this vCluster config and check if the controlPlane settings are correct?"
+> "Create a vCluster config with node sync enabled and etcd embedded"
 
-Claude will use:
-- `validate-config` to check syntax
-- `get-schema` for controlPlane schema
-- `extract-validation-rules` for validation constraints
+Claude will:
+1. Use `smart-query` or `extract-validation-rules` to research options
+2. Generate the YAML configuration
+3. **Automatically** call `create-vcluster-config` to validate
+4. Return validated, ready-to-use configuration
+
+**Why this works:** The `create-vcluster-config` tool forces Claude to validate every config it generates. You'll always get validated configs.
+
+### Validate User-Provided Configuration
+
+Ask Claude:
+> "Is this ingress configuration valid for vCluster v0.24?"
+> ```yaml
+> ingress:
+>   enabled: true
+>   host: "my-vcluster.example.com"
+> ```
+
+Claude will:
+1. Use `validate-config` with `--version="v0.24.0"` parameter
+2. Report any validation errors with specific paths
+3. Suggest fixes if needed
 
 ### Explore vCluster Options
 
@@ -152,8 +162,8 @@ Ask Claude:
 > "What high availability options are available in vCluster v0.19.0?"
 
 Claude will use:
-- `set-version` to switch to v0.19.0
-- `smart-query` to find HA-related settings
+- `smart-query` with `--version="v0.19.0"` to find HA-related settings
+- No need to "switch" versions - query directly with version parameter
 
 ### Compare Versions
 
@@ -161,8 +171,9 @@ Ask Claude:
 > "How did the sync.fromHost configuration change between v0.19.0 and v0.20.0?"
 
 Claude will use:
-- `set-version` to switch between versions
-- `smart-query` to fetch the same config from both versions
+- `smart-query` with `--version="v0.19.0"` for first version
+- `smart-query` with `--version="v0.20.0"` for second version
+- Can query both versions in parallel (stateless design)
 
 ## Token Optimization
 
@@ -170,10 +181,10 @@ This server is designed for efficient token usage:
 
 | Tool | Tokens | Strategy |
 |------|--------|----------|
-| validate-config | ~500 | Returns paths only, not full config |
-| get-schema | ~50-100 | Section filtering prevents full schema dump |
+| create-vcluster-config | ~300-600 | Validation + formatted response with emoji indicators |
+| validate-config | ~200-500 | Fast validation (<100ms), precise errors only |
 | smart-query | ~1-2K | Limits results to 50 matches |
-| extract-validation-rules | ~2-5K | Section-specific filtering |
+| extract-validation-rules | ~2-5K | Section-specific filtering, cache for knowledge base |
 
 ## Architecture Philosophy
 
