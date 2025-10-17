@@ -199,7 +199,7 @@ npx @modelcontextprotocol/inspector node src/index.js
 # Open http://localhost:5173
 
 # Run tests
-npm test  # 59 tests, all passing
+npm test 
 
 # Run HTTP server locally
 npm run start:http
