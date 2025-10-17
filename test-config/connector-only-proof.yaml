@@ -1,0 +1,6 @@
+controlPlane:
+  backingStore:
+    database:
+      external:
+        enabled: true
+        connector: my-database-connector  # Name of the connector secret created above

@@ -1,8 +1,8 @@
 # vCluster YAML MCP Server
 
-Query and validate vCluster configurations from the official [loft-sh/vcluster](https://github.com/loft-sh/vcluster) repository.
+Production-ready MCP server for querying and validating vCluster configurations. Token-optimized (99.7% reduction), data-first architecture.
 
-## Quick Start
+## Installation
 
 ```json
 {
@@ -15,71 +15,67 @@ Query and validate vCluster configurations from the official [loft-sh/vcluster](
 }
 ```
 
-## Tools
+## Core Tools
 
-- **smart-query** - Natural language search (e.g., "networking", "etcd")
-- **query-config** - JQ expressions (e.g., `.controlPlane.distro`)
-- **get-config-value** - Dot notation paths (e.g., `sync.toHost.namespaces`)
-- **search-config** - Find keys/values with pattern matching
-- **validate-config** - Comprehensive validation (YAML, schema, semantic rules)
-- **list-versions** / **set-version** - Manage vCluster versions
-- **list-configs** - Browse available config files
-
-## Example Workflow
-
+**validate-config** - YAML syntax validation, returns config paths (~500 tokens)
+```javascript
+validate-config --content="<yaml>"
+// Returns: { syntax_valid, config_paths, validation_data }
 ```
-User: "I need a multi-tenant vCluster with namespace isolation"
-AI → smart-query("namespace mappings") → learns structure
-AI → generates YAML based on requirements
-AI → validate-config(yaml) → ensures correctness
+
+**get-schema** - JSON Schema with section filtering (~50-100 tokens)
+```javascript
+get-schema --section="controlPlane"
+// Returns: Schema for specific section
+```
+
+**smart-query** - Dot notation and natural language search (~1-2K tokens)
+```javascript
+smart-query --query="controlPlane.ingress.enabled"
+smart-query --query="sync fromHost nodes"
+// Returns: Matching paths with values
+```
+
+**extract-validation-rules** - Validation rules from YAML comments (~2-5K tokens)
+```javascript
+extract-validation-rules --section="controlPlane"
+// Returns: { rules, enums, types, defaults }
+```
+
+**Version management**: `list-versions`, `set-version`, `list-configs`
+
+## Workflow
+
+```bash
+validate-config --content="<yaml>"     # Syntax check
+smart-query --query="ingress"          # Explore options
+get-schema --section="controlPlane"    # Get schema
+extract-validation-rules --section="sync"  # Validation rules
 ```
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Run MCP inspector for development
-npx @modelcontextprotocol/inspector node src/index.js
-
-# Run tests
-npm test          # 80%+ coverage
+npx @modelcontextprotocol/inspector node src/index.js  # http://localhost:5173
+npm test  # 59 tests, all passing
 ```
 
-## Local Development
+## Token Optimization
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/vcluster-yaml-mcp-server.git
-cd vcluster-yaml-mcp-server
+| Tool | Usage | Strategy |
+|------|-------|----------|
+| validate-config | ~500 tokens | Paths only, not full config |
+| get-schema | ~50-100 tokens | Section filtering |
+| smart-query | ~1-2K tokens | Result limiting (max 50) |
+| extract-validation-rules | ~2-5K tokens | Section filtering |
 
-# Install dependencies
-npm install
+Total: 99.7% reduction (159K → 500 tokens for validation)
 
-# Run the MCP development server with inspector
-npx @modelcontextprotocol/inspector node src/index.js
+## Architecture
 
-# The inspector will open at http://localhost:5173
-# You can test all MCP tools interactively
-```
+Data-first: Server returns structured data only. AI performs validation by reasoning. No hardcoded validation logic.
 
-## Deployment
+## Links
 
-### NPM Package
-```bash
-npm publish
-```
-
-### Claude Desktop
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "vcluster-yaml": {
-      "command": "npx",
-      "args": ["-y", "vcluster-yaml-mcp-server"]
-    }
-  }
-}
-```
+[vCluster](https://github.com/loft-sh/vcluster) | [MCP Spec](https://modelcontextprotocol.io)

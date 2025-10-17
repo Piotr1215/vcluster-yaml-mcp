@@ -144,8 +144,8 @@ describe('Smart Query Feature', () => {
       };
 
       const response = await toolHandler(request);
-      expect(response.content[0].text).toContain('No direct matches');
-      expect(response.content[0].text).toContain('available configuration sections');
+      expect(response.content[0].text).toContain('No matches');
+      expect(response.content[0].text).toContain('Tips');
     });
 
     it('should auto-detect and use available YAML files', async () => {

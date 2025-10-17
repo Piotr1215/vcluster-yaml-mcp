@@ -15,7 +15,7 @@ vi.mock('../src/github.js', () => ({
 
 import { githubClient } from '../src/github.js';
 
-describe('Edge Case Tests for Path Filtering', () => {
+describe('Edge Case Tests - Data Structure Validation', () => {
   let server;
   let handler;
 
@@ -26,7 +26,7 @@ describe('Edge Case Tests for Path Filtering', () => {
   });
 
   describe('Wildcard Path Handling', () => {
-    it('should handle wildcard patterns in namespace mappings', async () => {
+    it('should return structured data for wildcard patterns in namespace mappings', async () => {
       const config = `
 sync:
   toHost:
@@ -37,21 +37,8 @@ sync:
           "feature-*": "dev-*"
 `;
 
-      const yamlWithComments = `
-sync:
-  toHost:
-    namespaces:
-      # Namespace mappings support wildcards
-      # Required: at least one mapping
-      mappings:
-        byName:
-          # Wildcard patterns must be quoted
-          # Valid pattern: "customer-*"
-          # Pattern format: "source-*": "target-*"
-`;
+      githubClient.getFileContent.mockResolvedValueOnce('sync:\n  toHost:\n    namespaces:');
 
-      githubClient.getFileContent.mockResolvedValue(yamlWithComments);
-      
       const response = await handler({
         method: 'tools/call',
         params: {
@@ -59,18 +46,13 @@ sync:
           arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      
-      // Should still validate correctly with wildcards
-      expect(result.layers.syntax.valid).toBe(true);
-      expect(result.layers.procedural.valid).toBe(true);
-      
-      // Should include relevant semantic rules for namespace mappings
-      const hasNamespaceMappingRules = result.layers.semantic.rules.some(rule =>
-        rule.path && rule.path.includes('namespaces.mappings')
-      );
-      expect(hasNamespaceMappingRules).toBe(true);
+
+      expect(result.syntax_valid).toBe(true);
+      expect(result.config_paths).toBeDefined();
+      expect(result.config_paths.some(p => p.includes('sync'))).toBe(true);
+      expect(result.config_paths.some(p => p.includes('namespaces'))).toBe(true);
     });
   });
 
@@ -87,20 +69,8 @@ controlPlane:
         - --cluster-cidr=10.0.0.0/16
 `;
 
-      const yamlWithComments = `
-controlPlane:
-  distro:
-    k3s:
-      # Extra arguments passed to k3s
-      # Required: Must be valid k3s flags
-      extraArgs:
-        # Each argument should start with --
-        # Common args: --disable-network-policy, --flannel-backend
-        # Valid values: --disable-network-policy, --flannel-backend=none
-`;
+      githubClient.getFileContent.mockResolvedValue('controlPlane:\n  distro:\n    k3s:');
 
-      githubClient.getFileContent.mockResolvedValue(yamlWithComments);
-      
       const response = await handler({
         method: 'tools/call',
         params: {
@@ -108,18 +78,12 @@ controlPlane:
           arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      
-      // Should handle array paths correctly
-      expect(result.layers.syntax.valid).toBe(true);
-      expect(result.layers.procedural.valid).toBe(true);
-      
-      // Should include rules for extraArgs (parent path of array items)
-      const hasExtraArgsRules = result.layers.semantic.rules.some(rule =>
-        rule.path && rule.path.includes('extraArgs')
-      );
-      expect(hasExtraArgsRules).toBe(true);
+
+      expect(result.syntax_valid).toBe(true);
+      expect(result.config_paths.some(p => p.includes('controlPlane'))).toBe(true);
+      expect(result.config_paths.some(p => p.includes('k3s'))).toBe(true);
     });
 
     it('should handle complex nested arrays', async () => {
@@ -134,18 +98,8 @@ controlPlane:
         claimName: vcluster-data
 `;
 
-      const yamlWithComments = `
-controlPlane:
-  # Additional volumes for the control plane
-  # Required: Volume definitions
-  volumes:
-    # Volume definitions follow Kubernetes spec
-    # Each volume must have a unique name
-    # Valid types: configMap, secret, persistentVolumeClaim
-`;
+      githubClient.getFileContent.mockResolvedValue('controlPlane:\n  volumes:');
 
-      githubClient.getFileContent.mockResolvedValue(yamlWithComments);
-      
       const response = await handler({
         method: 'tools/call',
         params: {
@@ -153,22 +107,17 @@ controlPlane:
           arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      
-      // Should handle nested objects in arrays
-      expect(result.layers.syntax.valid).toBe(true);
-      
-      // Should include volume-related rules
-      const hasVolumeRules = result.layers.semantic.rules.some(rule =>
-        rule.path && rule.path.includes('volumes')
-      );
-      expect(hasVolumeRules).toBe(true);
+
+      expect(result.syntax_valid).toBe(true);
+      expect(result.config_paths.some(p => p.includes('controlPlane'))).toBe(true);
+      expect(result.config_paths.some(p => p.includes('volumes'))).toBe(true);
     });
   });
 
   describe('Deep Nested Path Matching', () => {
-    it('should match deeply nested configuration paths', async () => {
+    it('should return paths for deeply nested configuration', async () => {
       const config = `
 controlPlane:
   backingStore:
@@ -183,21 +132,8 @@ controlPlane:
             storageClass: fast-ssd
 `;
 
-      const yamlWithComments = `
-controlPlane:
-  backingStore:
-    etcd:
-      deploy:
-        statefulSet:
-          highAvailability:
-            # Minimum 3 replicas for HA
-            replicas: 3
-          persistence:
-            # Size must be specified for etcd storage
-`;
+      githubClient.getFileContent.mockResolvedValue('controlPlane:\n  backingStore:');
 
-      githubClient.getFileContent.mockResolvedValue(yamlWithComments);
-      
       const response = await handler({
         method: 'tools/call',
         params: {
@@ -205,22 +141,17 @@ controlPlane:
           arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      
-      // Should include rules for deeply nested paths
-      const hasDeepRules = result.layers.semantic.rules.some(rule =>
-        rule.path && (
-          rule.path.includes('highAvailability') ||
-          rule.path.includes('persistence')
-        )
-      );
-      expect(hasDeepRules).toBe(true);
+
+      expect(result.syntax_valid).toBe(true);
+      expect(result.config_paths.some(p => p.includes('highAvailability'))).toBe(true);
+      expect(result.config_paths.some(p => p.includes('persistence'))).toBe(true);
     });
   });
 
   describe('Path Normalization', () => {
-    it('should correctly normalize paths with special characters', async () => {
+    it('should correctly handle paths with special characters', async () => {
       const config = `
 sync:
   toHost:
@@ -231,24 +162,26 @@ sync:
           "grafana.ini": "monitoring-grafana-config"
 `;
 
+      githubClient.getFileContent.mockResolvedValue('sync:\n  toHost:');
+
       const response = await handler({
         method: 'tools/call',
         params: {
           name: 'validate-config',
-          arguments: { content: config, includeSemantic: false }
+          arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      
-      // Should handle special characters in keys
-      expect(result.layers.syntax.valid).toBe(true);
-      expect(result.layers.procedural.valid).toBe(true);
+
+      expect(result.syntax_valid).toBe(true);
+      expect(result.config_paths.some(p => p.includes('sync'))).toBe(true);
+      expect(result.config_paths.some(p => p.includes('configMaps'))).toBe(true);
     });
   });
 
-  describe('Minimal Output Mode', () => {
-    it('should return compact output when includeSemantic is false', async () => {
+  describe('Output Structure Tests', () => {
+    it('should return consistent data structure regardless of config complexity', async () => {
       const config = `
 controlPlane:
   distro:
@@ -271,28 +204,26 @@ sync:
       enabled: false
 `;
 
+      githubClient.getFileContent.mockResolvedValue('controlPlane:\n  distro:');
+
       const response = await handler({
         method: 'tools/call',
         params: {
           name: 'validate-config',
-          arguments: { content: config, includeSemantic: false }
+          arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      const responseText = response.content[0].text;
-      
-      // Should have minimal semantic layer
-      expect(result.layers.semantic.extracted).toBe(0);
-      expect(result.layers.semantic.rules).toHaveLength(0);
-      expect(result.layers.semantic.summary).toBe("Semantic validation disabled");
-      
-      // Response should be compact (less than 100 lines)
-      const lineCount = responseText.split('\n').length;
-      expect(lineCount).toBeLessThan(100);
+
+      expect(result).toHaveProperty('syntax_valid');
+      expect(result).toHaveProperty('version');
+      expect(result).toHaveProperty('config_paths');
+      expect(result).toHaveProperty('validation_data');
+      expect(result).toHaveProperty('instructions');
     });
 
-    it('should include filtered semantic rules by default', async () => {
+    it('should extract comprehensive path list', async () => {
       const config = `
 controlPlane:
   distro:
@@ -300,49 +231,24 @@ controlPlane:
       enabled: true
 `;
 
-      const yamlWithComments = `
-controlPlane:
-  # Control plane configuration
-  # Required: Must specify a distro
-  distro:
-    # Distribution selection
-    # Valid values: k3s, k0s, k8s
-    k3s:
-      # Enable k3s distro
-      # Default: false
-      enabled: true
-# Many other unrelated comments and rules below...
-sync:
-  # Sync configuration with 50+ rules
-  toHost:
-    # Lots of rules here that should NOT be included
-    # This section has many rules
-    # But they should be filtered out
-`;
+      githubClient.getFileContent.mockResolvedValue('controlPlane:\n  distro:\n    k3s:\n      enabled: true');
 
-      githubClient.getFileContent.mockResolvedValue(yamlWithComments);
-      
       const response = await handler({
         method: 'tools/call',
         params: {
           name: 'validate-config',
-          arguments: { content: config }  // includeSemantic defaults to true
+          arguments: { content: config }
         }
       });
-      
+
       const result = JSON.parse(response.content[0].text);
-      
-      // Should include some semantic rules
-      expect(result.layers.semantic.extracted).toBeGreaterThan(0);
-      
-      // Should have total available rules
-      expect(result.layers.semantic.total_available).toBeGreaterThan(0);
-      
-      // Extracted should be less than or equal to total (could be all relevant for small config)
-      expect(result.layers.semantic.extracted).toBeLessThanOrEqual(result.layers.semantic.total_available);
-      
-      // Should have meaningful summary
-      expect(result.layers.semantic.summary).toContain("relevant to your configuration");
+
+      expect(result.config_paths).toBeDefined();
+      expect(Array.isArray(result.config_paths)).toBe(true);
+      expect(result.config_paths.length).toBeGreaterThan(0);
+
+      const distroFields = result.config_paths.filter(p => p.includes('distro'));
+      expect(distroFields.length).toBeGreaterThan(0);
     });
   });
 });
