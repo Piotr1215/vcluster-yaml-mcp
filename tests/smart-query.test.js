@@ -214,7 +214,7 @@ describe('Smart Query Feature', () => {
 
       const response = await toolHandler(request);
       if (!response.content[0].text.includes('No direct matches')) {
-        expect(response.content[0].text).toMatch(/Found \d+ result\(s\)/);
+        expect(response.content[0].text).toMatch(/Found \d+ match(es)?/);
       }
     });
 

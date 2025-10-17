@@ -84,8 +84,54 @@ All query tools accept an optional `version` parameter (defaults to "main"):
 smart-query --query="controlPlane.ingress.enabled" --version="v0.19.0"
 smart-query --query="namespace syncing" --version="main"
 smart-query --query="etcd"  // Defaults to "main"
-// Returns: Matching configuration paths and their values with version info
 ```
+
+**Output Format (kubectl-style):**
+```
+Found 4 matches for "replicas" in chart/values.yaml (v0.24.0)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MATCH: controlPlane.statefulSet.highAvailability.replicas
+TYPE:  integer
+VALUE: 1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MATCH: controlPlane.coredns.deployment.replicas
+TYPE:  integer
+VALUE: 1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MATCH: controlPlane.statefulSet.highAvailability
+TYPE:  object
+
+FIELDS:
+  replicas <integer>
+    value: 1
+
+  leaseDuration <integer>
+    value: 60
+
+  renewDeadline <integer>
+    value: 40
+
+  retryPeriod <integer>
+    value: 15
+
+RELATED CONFIGS:
+  • controlPlane.statefulSet.resources - Resource limits for HA mode
+  • controlPlane.backingStore.etcd.deploy.statefulSet.highAvailability
+```
+
+**Features:**
+- ✅ **Structured output** - kubectl-style format
+- ✅ **Type information** - Every value shows its type (integer, string, boolean, array, object)
+- ✅ **Relevance ranking** - Exact matches appear first, results sorted by relevance
+- ✅ **Related configs** - Suggests commonly configured fields together
+- ✅ **Smart formatting** - Objects show structure, not full content dumps
+- ✅ **LLM-friendly** - Easy to parse and understand for AI assistants
 
 ### Config Creation & Validation
 
@@ -177,24 +223,14 @@ Claude will use:
 
 ## Token Optimization
 
-This server is designed for efficient token usage:
+This server is designed for efficient token usage with the new kubectl-style format:
 
-| Tool | Tokens | Strategy |
-|------|--------|----------|
-| create-vcluster-config | ~300-600 | Validation + formatted response with emoji indicators |
-| validate-config | ~200-500 | Fast validation (<100ms), precise errors only |
-| smart-query | ~1-2K | Limits results to 50 matches |
-| extract-validation-rules | ~2-5K | Section-specific filtering, cache for knowledge base |
-
-## Architecture Philosophy
-
-**Data-First, Not Logic-First**
-
-The server returns structured data and lets the AI reason about validation. 
-- Adapts automatically when vCluster changes
-- Works across versions without updates
-- Leverages AI's reasoning vs rigid code
-- Reduces maintenance burden
+| Tool | Tokens | Strategy | Performance |
+|------|--------|----------|-------------|
+| create-vcluster-config | ~300-600 | Validation + formatted response with emoji indicators | <100ms |
+| validate-config | ~200-500 | Fast validation, precise errors only | <100ms |
+| smart-query | ~800-1.5K | Structured output (was ~2K with JSON dumps), limits to 50 matches | <100ms |
+| extract-validation-rules | ~2-5K | Section-specific filtering, cache for knowledge base | <100ms |
 
 ## Development
 

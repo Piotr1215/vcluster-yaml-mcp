@@ -58,7 +58,7 @@ describe('Tool Implementations', () => {
       };
 
       const response = await toolHandler(request);
-      expect(response.content[0].text).toContain('result(s)');
+      expect(response.content[0].text).toMatch(/match(es)?/);
       expect(response.content[0].text.toLowerCase()).toContain('etcd');
     });
 
