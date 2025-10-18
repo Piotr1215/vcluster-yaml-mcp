@@ -1,4 +1,16 @@
-// Simple API key authentication middleware
+import crypto from 'crypto';
+
+// Timing-safe string comparison
+function secureCompare(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
+}
+
+// API key authentication middleware with timing-safe comparison
 export function requireApiKey(req, res, next) {
   const authHeader = req.headers['authorization'];
 
@@ -10,9 +22,14 @@ export function requireApiKey(req, res, next) {
   }
 
   const token = authHeader.substring(7);
-  const validTokens = (process.env.VALID_API_KEYS || '').split(',');
+  const validTokens = (process.env.VALID_API_KEYS || '').split(',').filter(t => t.length > 0);
 
-  if (!validTokens.includes(token)) {
+  // Use timing-safe comparison to prevent timing attacks
+  const isValid = validTokens.some(validToken =>
+    validToken.length === token.length && secureCompare(validToken, token)
+  );
+
+  if (!isValid) {
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Invalid API key'

@@ -190,6 +190,18 @@ function createAjvInstance() {
  */
 export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = null) {
   const startTime = Date.now();
+  const MAX_YAML_SIZE = 1024 * 1024; // 1MB
+
+  // Check YAML size limit
+  if (snippetYaml.length > MAX_YAML_SIZE) {
+    return {
+      valid: false,
+      error: 'YAML exceeds 1MB limit',
+      size_bytes: snippetYaml.length,
+      max_size_bytes: MAX_YAML_SIZE,
+      elapsed_ms: Date.now() - startTime
+    };
+  }
 
   // Parse YAML
   let parsedSnippet;
