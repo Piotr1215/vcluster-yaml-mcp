@@ -33,7 +33,8 @@ describe('Argument Parsing - Commander', () => {
     expect(stdout).toContain('Search for vCluster configuration fields');
     expect(stdout).toContain('--format');
     expect(stdout).toContain('--file');
-    expect(stdout).toContain('--version');
+    expect(stdout).toContain('--schema-version');
+    expect(stdout).toContain('Examples:');
   });
 
   it('should display command-specific help for validate', async () => {
@@ -42,7 +43,8 @@ describe('Argument Parsing - Commander', () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain('Validate vCluster configuration');
     expect(stdout).toContain('--format');
-    expect(stdout).toContain('--version');
+    expect(stdout).toContain('--schema-version');
+    expect(stdout).toContain('Examples:');
   });
 
   it('should display command-specific help for list-versions', async () => {
@@ -73,13 +75,14 @@ describe('Argument Parsing - Commander', () => {
     }
   });
 
-  it('should fail gracefully with missing validate argument', async () => {
+  it('should fail gracefully with missing validate content (no stdin)', async () => {
     try {
-      await execa('node', [CLI_PATH, 'validate']);
+      // Without stdin, validate should fail with an error about no content
+      await execa('node', [CLI_PATH, 'validate'], { input: '' });
       expect.fail('Should have thrown an error');
     } catch (error) {
       expect(error.exitCode).toBe(1);
-      expect(error.stderr).toContain("error: missing required argument 'content'");
+      expect(error.stderr).toContain('No content to validate');
     }
   });
 

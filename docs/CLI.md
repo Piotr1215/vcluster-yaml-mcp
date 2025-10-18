@@ -59,7 +59,7 @@ npm install
 # Run CLI directly with node
 node src/cli.js query sync --format table
 node src/cli.js list-versions
-node src/cli.js validate "sync:\n  enabled: true"
+node src/cli.js validate vcluster.yaml
 
 # Or link locally to test as if globally installed
 npm link
@@ -77,7 +77,7 @@ Search for vCluster configuration fields:
 vcluster-yaml query sync
 
 # Search with specific version
-vcluster-yaml query "controlPlane" --version v0.24.0
+vcluster-yaml query "controlPlane" --schema-version v0.24.0
 
 # Search in a specific file
 vcluster-yaml query etcd --file chart/values.yaml
@@ -152,14 +152,20 @@ vcluster-yaml list-versions --format yaml
 Validate vCluster YAML configurations:
 
 ```bash
-# Validate YAML content
-vcluster-yaml validate "sync:\n  toHost:\n    pods:\n      enabled: true"
+# Validate a vCluster config file
+vcluster-yaml validate vcluster.yaml
 
-# Validate with specific version
-vcluster-yaml validate "controlPlane:\n  replicas: 3" --version v0.24.0
+# Validate with specific schema version
+vcluster-yaml validate vcluster.yaml --schema-version v0.24.0
 
-# Output as table
-vcluster-yaml validate "invalid: yaml: [" --format table
+# Validate from stdin
+cat vcluster.yaml | vcluster-yaml validate -
+
+# Output as table for better readability
+vcluster-yaml validate vcluster.yaml --format table
+
+# Validate from stdin using redirection
+vcluster-yaml validate - < vcluster.yaml
 ```
 
 **Example Output (Valid):**
@@ -190,14 +196,15 @@ vcluster-yaml validate "invalid: yaml: [" --format table
 **Global Options:**
 - `-f, --format <format>` - Output format: `json`, `yaml`, or `table` (default: `json`)
 - `-h, --help` - Show help
-- `--version` - Show version number
+- `--version` - Show CLI version number
 
 **Query Options:**
 - `--file <file>` - Configuration file to search (default: `chart/values.yaml`)
-- `--version <version>` - vCluster version or branch (default: `main`)
+- `-s, --schema-version <version>` - vCluster version or branch (default: `main`)
 
 **Validate Options:**
-- `--version <version>` - vCluster version for schema validation (default: `main`)
+- `-s, --schema-version <version>` - vCluster version for schema validation (default: `main`)
+- `[file]` - YAML file to validate (use `-` for stdin, omit to read from stdin)
 
 ## Exit Codes
 
@@ -218,7 +225,7 @@ vcluster-yaml query "sync.toHost.pods" --format table
 
 ```bash
 # Validate vCluster config in CI pipeline
-vcluster-yaml validate "$(cat vcluster.yaml)" --version v0.24.0
+vcluster-yaml validate vcluster.yaml --schema-version v0.24.0
 if [ $? -ne 0 ]; then
   echo "Configuration validation failed"
   exit 1
@@ -229,8 +236,8 @@ fi
 
 ```bash
 # Check if config works across versions
-vcluster-yaml validate "$(cat vcluster.yaml)" --version v0.23.0
-vcluster-yaml validate "$(cat vcluster.yaml)" --version v0.24.0
+vcluster-yaml validate vcluster.yaml --schema-version v0.23.0
+vcluster-yaml validate vcluster.yaml --schema-version v0.24.0
 ```
 
 ### Script Integration

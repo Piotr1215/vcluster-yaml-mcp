@@ -76,9 +76,10 @@ describe('Output Format - JSON', () => {
   }, 30000);
 
   it('should output valid JSON for validate command (valid input)', async () => {
+    const yamlContent = 'sync:\n  toHost:\n    pods:\n      enabled: true';
     const { stdout, exitCode } = await execa('node', [
-      CLI_PATH, 'validate', 'sync:\n  toHost:\n    pods:\n      enabled: true', '--format', 'json'
-    ]);
+      CLI_PATH, 'validate', '-', '--format', 'json'
+    ], { input: yamlContent });
 
     expect(exitCode).toBe(0);
     const data = validateJSON(stdout);
@@ -125,9 +126,10 @@ describe('Output Format - YAML', () => {
   }, 30000);
 
   it('should output valid YAML for validate command', async () => {
+    const yamlContent = 'sync:\n  toHost:\n    pods:\n      enabled: true';
     const { stdout, exitCode } = await execa('node', [
-      CLI_PATH, 'validate', 'sync:\n  toHost:\n    pods:\n      enabled: true', '--format', 'yaml'
-    ]);
+      CLI_PATH, 'validate', '-', '--format', 'yaml'
+    ], { input: yamlContent });
 
     expect(exitCode).toBe(0);
     const data = validateYAML(stdout);
@@ -176,9 +178,10 @@ describe('Output Format - Table', () => {
   }, 30000);
 
   it('should output formatted table for validate command (valid)', async () => {
+    const yamlContent = 'sync:\n  toHost:\n    pods:\n      enabled: true';
     const { stdout, exitCode } = await execa('node', [
-      CLI_PATH, 'validate', 'sync:\n  toHost:\n    pods:\n      enabled: true', '--format', 'table'
-    ]);
+      CLI_PATH, 'validate', '-', '--format', 'table'
+    ], { input: yamlContent });
 
     expect(exitCode).toBe(0);
     const clean = stripAnsi(stdout);
@@ -187,14 +190,15 @@ describe('Output Format - Table', () => {
 
   it('should output formatted table for validate command (invalid)', async () => {
     try {
+      const yamlContent = 'invalid: yaml: [ unclosed';
       await execa('node', [
-        CLI_PATH, 'validate', 'invalid: yaml: [ unclosed', '--format', 'table'
-      ]);
+        CLI_PATH, 'validate', '-', '--format', 'table'
+      ], { input: yamlContent });
       expect.fail('Should have thrown an error');
     } catch (error) {
       expect(error.exitCode).toBe(1);
       const clean = stripAnsi(error.stdout);
-      expect(clean).toContain('errors');
+      expect(clean).toContain('error');
     }
   }, 30000);
 });

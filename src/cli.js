@@ -9,6 +9,7 @@
 import { Command } from 'commander';
 import { handleQuery, handleListVersions, handleValidate } from './cli-handlers.js';
 import { formatOutput } from './formatters.js';
+import { readContentSource } from './cli-utils.js';
 
 const program = new Command();
 
@@ -22,8 +23,14 @@ program
   .command('query <query>')
   .description('Search for vCluster configuration fields')
   .option('--file <file>', 'Configuration file to search', 'chart/values.yaml')
-  .option('--version <version>', 'vCluster version or branch', 'main')
+  .option('-s, --schema-version <version>', 'vCluster version or branch', 'main')
   .option('-f, --format <format>', 'Output format (json, yaml, table)', 'json')
+  .addHelpText('after', `
+Examples:
+  $ vcluster-yaml query sync
+  $ vcluster-yaml query sync --schema-version v0.24.0
+  $ vcluster-yaml query "controlPlane.replicas" --format table
+  `)
   .action(async (query, options) => {
     try {
       // Validate format option
@@ -32,9 +39,15 @@ program
         process.exit(1);
       }
 
+      // Add validation for empty query
+      if (!query || query.trim() === '') {
+        console.error(`Error: Query cannot be empty. Try 'vcluster-yaml query sync' or see examples with --help`);
+        process.exit(1);
+      }
+
       const result = await handleQuery(query, {
         file: options.file,
-        version: options.version
+        version: options.schemaVersion
       });
 
       if (!result.success) {
@@ -91,11 +104,22 @@ program
 
 // Validate command
 program
-  .command('validate <content>')
+  .command('validate [file]')
   .description('Validate vCluster configuration')
-  .option('--version <version>', 'vCluster version for schema', 'main')
+  .option('-s, --schema-version <version>', 'vCluster version for schema', 'main')
   .option('-f, --format <format>', 'Output format (json, yaml, table)', 'json')
-  .action(async (content, options) => {
+  .addHelpText('after', `
+Arguments:
+  file                   YAML file to validate (use '-' for stdin, omit to read from stdin)
+
+Examples:
+  $ vcluster-yaml validate vcluster.yaml
+  $ vcluster-yaml validate vcluster.yaml --schema-version v0.24.0
+  $ cat vcluster.yaml | vcluster-yaml validate -
+  $ vcluster-yaml validate - < vcluster.yaml
+  $ vcluster-yaml validate vcluster.yaml --format table
+  `)
+  .action(async (file, options) => {
     try {
       // Validate format option
       if (!['json', 'yaml', 'table'].includes(options.format)) {
@@ -103,8 +127,24 @@ program
         process.exit(1);
       }
 
+      // Read content from file or stdin
+      let content;
+      try {
+        const result = await readContentSource(file);
+        content = result.content;
+      } catch (error) {
+        console.error(`Error: ${error.message}`);
+        process.exit(1);
+      }
+
+      // Check for empty content
+      if (!content || content.trim() === '') {
+        console.error(`Error: No content to validate. Please provide a file path or pipe content via stdin.`);
+        process.exit(1);
+      }
+
       const result = await handleValidate(content, {
-        version: options.version
+        version: options.schemaVersion
       });
 
       // For validation, always output the result (even if not successful)
