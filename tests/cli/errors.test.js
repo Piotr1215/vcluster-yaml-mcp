@@ -17,9 +17,10 @@ const CLI_PATH = join(projectRoot, 'src', 'cli.js');
 describe('Error Handling', () => {
   it('should handle invalid YAML with exit code 1', async () => {
     try {
+      const yamlContent = 'invalid yaml content: [ unclosed';
       await execa('node', [
-        CLI_PATH, 'validate', 'invalid yaml content: [ unclosed', '--format', 'json'
-      ]);
+        CLI_PATH, 'validate', '-', '--format', 'json'
+      ], { input: yamlContent });
       expect.fail('Should have thrown an error');
     } catch (error) {
       expect(error.exitCode).toBe(1);
@@ -71,17 +72,19 @@ describe('Error Handling', () => {
   }, 30000);
 
   it('should exit with code 0 for valid YAML', async () => {
+    const yamlContent = 'sync:\n  toHost:\n    pods:\n      enabled: true';
     const { exitCode } = await execa('node', [
-      CLI_PATH, 'validate', 'sync:\n  toHost:\n    pods:\n      enabled: true', '--format', 'json'
-    ]);
+      CLI_PATH, 'validate', '-', '--format', 'json'
+    ], { input: yamlContent });
     expect(exitCode).toBe(0);
   }, 30000);
 
   it('should exit with code 1 for invalid YAML syntax', async () => {
     try {
+      const yamlContent = 'bad: yaml: [';
       await execa('node', [
-        CLI_PATH, 'validate', 'bad: yaml: ['
-      ]);
+        CLI_PATH, 'validate', '-'
+      ], { input: yamlContent });
       expect.fail('Should have thrown an error');
     } catch (error) {
       expect(error.exitCode).toBe(1);
@@ -90,9 +93,10 @@ describe('Error Handling', () => {
 
   it('should handle validation errors with proper JSON output', async () => {
     try {
+      const yamlContent = 'invalid: [ ] : yaml';
       await execa('node', [
-        CLI_PATH, 'validate', 'invalid: [ ] : yaml', '--format', 'json'
-      ]);
+        CLI_PATH, 'validate', '-', '--format', 'json'
+      ], { input: yamlContent });
       expect.fail('Should have thrown an error');
     } catch (error) {
       expect(error.exitCode).toBe(1);

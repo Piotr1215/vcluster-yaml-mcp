@@ -76,6 +76,11 @@ npx -p vcluster-yaml-mcp-server vcluster-yaml query sync --format table
 # Or install globally
 npm install -g vcluster-yaml-mcp-server
 vcluster-yaml query sync --format table
+
+# Validate configurations with ease
+vcluster-yaml validate my-config.yaml
+cat my-config.yaml | vcluster-yaml validate -
+vcluster-yaml validate my-config.yaml --schema-version v0.24.0
 ```
 
 📖 **[Full CLI Documentation →](docs/CLI.md)**
