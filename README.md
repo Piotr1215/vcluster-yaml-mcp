@@ -71,7 +71,7 @@ The package also provides a standalone CLI for quick queries and validation with
 
 ```bash
 # Quick start with npx (no installation)
-npx -y vcluster-yaml-mcp-server vcluster-yaml query sync --format table
+npx -p vcluster-yaml-mcp-server vcluster-yaml query sync --format table
 
 # Or install globally
 npm install -g vcluster-yaml-mcp-server

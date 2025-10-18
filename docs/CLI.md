@@ -18,11 +18,11 @@ vcluster-yaml query sync --format table
 ### Option 2: Use directly with npx (no installation)
 
 ```bash
-# Syntax: npx -y <package-name> <binary-name> <command> [options]
-npx -y vcluster-yaml-mcp-server vcluster-yaml query sync --format table
+# Syntax: npx -p <package-name> <binary-name> <command> [options]
+npx -p vcluster-yaml-mcp-server vcluster-yaml query sync --format table
 ```
 
-> **Note:** When using npx, you must specify `vcluster-yaml` after the package name since the package contains multiple binaries.
+> **Note:** When using npx, you must use `-p` to specify the package name and then call the `vcluster-yaml` binary, since the package contains multiple binaries.
 
 ### Option 3: Install locally in a project
 
