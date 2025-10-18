@@ -1,7 +1,6 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import yaml from 'js-yaml';
-import jq from 'node-jq';
 import { githubClient } from './github.js';
 import { validateSnippet } from './snippet-validator.js';
 
@@ -591,77 +590,6 @@ export function createServer() {
           };
         }
 
-        case 'query-config': {
-          const version = args.version || 'main';
-          let yamlData;
-
-          // Load YAML data from GitHub or content
-          if (args.content) {
-            yamlData = yaml.load(args.content);
-          } else if (args.file) {
-            yamlData = await githubClient.getYamlContent(args.file, version);
-          } else {
-            // Default to chart/values.yaml
-            yamlData = await githubClient.getYamlContent('chart/values.yaml', version);
-          }
-          
-          // Convert YAML to JSON for jq processing
-          const jsonData = JSON.stringify(yamlData);
-          
-          // Run jq query
-          const options = {
-            input: 'string',
-            output: args.raw ? 'string' : 'json'
-          };
-          
-          const result = await jq.run(args.query, jsonData, options);
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-              }
-            ]
-          };
-        }
-
-        case 'get-config-value': {
-          const version = args.version || 'main';
-          let yamlData;
-
-          // Load YAML data from GitHub or content
-          if (args.content) {
-            yamlData = yaml.load(args.content);
-          } else if (args.file) {
-            yamlData = await githubClient.getYamlContent(args.file, version);
-          } else {
-            yamlData = await githubClient.getYamlContent('config/values.yaml', version);
-          }
-          
-          // Convert dot notation to jq query
-          const jqQuery = '.' + args.path.split('.').map(part => {
-            // Handle array indices
-            if (/^\d+$/.test(part)) {
-              return `[${part}]`;
-            }
-            // Handle special characters in keys
-            return `["${part}"]`;
-          }).join('');
-          
-          const jsonData = JSON.stringify(yamlData);
-          const result = await jq.run(jqQuery, jsonData, { input: 'string', output: 'json' });
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Value at ${args.path}: ${JSON.stringify(result, null, 2)}`
-              }
-            ]
-          };
-        }
-
         case 'extract-validation-rules': {
           const version = args.version || 'main';
           const fileName = args.file || 'chart/values.yaml';
@@ -754,67 +682,6 @@ export function createServer() {
               ]
             };
           }
-        }
-
-        case 'search-config': {
-          const version = args.version || 'main';
-          let yamlData;
-
-          // Load YAML data from GitHub or content
-          if (args.content) {
-            yamlData = yaml.load(args.content);
-          } else if (args.file) {
-            yamlData = await githubClient.getYamlContent(args.file, version);
-          } else {
-            yamlData = await githubClient.getYamlContent('config/values.yaml', version);
-          }
-
-          const searchTerm = args.search.toLowerCase();
-          const matches = [];
-
-          // Recursive search function
-          function searchObject(obj, path = '') {
-            if (obj && typeof obj === 'object') {
-              for (const [key, value] of Object.entries(obj)) {
-                const currentPath = path ? `${path}.${key}` : key;
-
-                // Check if key matches
-                if (key.toLowerCase().includes(searchTerm)) {
-                  if (args.keysOnly) {
-                    matches.push(`Key: ${currentPath}`);
-                  } else {
-                    matches.push(`Key: ${currentPath} = ${JSON.stringify(value)}`);
-                  }
-                }
-
-                // Check if value matches (if not keysOnly)
-                if (!args.keysOnly && value !== null && value !== undefined) {
-                  const valueStr = JSON.stringify(value).toLowerCase();
-                  if (valueStr.includes(searchTerm)) {
-                    matches.push(`Value at ${currentPath}: ${JSON.stringify(value)}`);
-                  }
-                }
-
-                // Recurse into objects
-                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                  searchObject(value, currentPath);
-                }
-              }
-            }
-          }
-
-          searchObject(yamlData);
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: matches.length > 0
-                  ? `Found ${matches.length} match(es):\n${matches.join('\n')}`
-                  : `No matches found for "${args.search}"`
-              }
-            ]
-          };
         }
 
         default:

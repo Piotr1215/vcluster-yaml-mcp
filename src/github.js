@@ -75,6 +75,16 @@ class GitHubClient {
 
   // Get file content from GitHub
   async getFileContent(path, ref = 'main') {
+    // Validate path - prevent path traversal
+    if (path.includes('..') || path.startsWith('/')) {
+      throw new Error('Invalid path: path traversal not allowed');
+    }
+
+    // Validate ref format (branch, tag, or commit SHA)
+    if (!/^[\w.\/-]+$/.test(ref)) {
+      throw new Error('Invalid ref format');
+    }
+
     const actualRef = ref;
     const cacheKey = `file:${actualRef}:${path}`;
     const cached = this.getFromCache(cacheKey);

@@ -3,16 +3,48 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from './server.js';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { requireApiKey } from './middleware/auth.js';
 
 const PORT = process.env.PORT || 3000;
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
 
 const app = express();
-app.use(express.json());
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
+// Request size limiting
+app.use(express.json({
+  limit: '1mb',
+  strict: true
+}));
+
+// Rate limiting for general endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500,
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Rate limiting for MCP endpoint (allows for interactive sessions)
+const mcpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000,
+  message: { error: 'Too many requests to MCP endpoint, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Health check endpoint
-app.get('/health', (_req, res) => {
+app.get('/health', apiLimiter, (_req, res) => {
   res.json({
     status: 'ok',
     name: 'vcluster-yaml-mcp-server',
@@ -56,8 +88,8 @@ const mcpHandler = async (req, res) => {
 };
 
 // Support both GET and POST for MCP endpoint
-app.get('/mcp', REQUIRE_AUTH ? requireApiKey : (req, res, next) => next(), mcpHandler);
-app.post('/mcp', REQUIRE_AUTH ? requireApiKey : (req, res, next) => next(), mcpHandler);
+app.get('/mcp', mcpLimiter, REQUIRE_AUTH ? requireApiKey : (req, res, next) => next(), mcpHandler);
+app.post('/mcp', mcpLimiter, REQUIRE_AUTH ? requireApiKey : (req, res, next) => next(), mcpHandler);
 
 app.listen(PORT, () => {
   console.log(`vcluster-yaml-mcp-server HTTP running on port ${PORT}`);
