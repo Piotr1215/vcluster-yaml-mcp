@@ -65,6 +65,21 @@ Use the public instance (always running latest version):
 }
 ```
 
+## Command-Line Interface
+
+The package also provides a standalone CLI for quick queries and validation without MCP setup:
+
+```bash
+# Quick start with npx (no installation)
+npx -y vcluster-yaml-mcp-server vcluster-yaml query sync --format table
+
+# Or install globally
+npm install -g vcluster-yaml-mcp-server
+vcluster-yaml query sync --format table
+```
+
+📖 **[Full CLI Documentation →](docs/CLI.md)**
+
 ## Available Tools
 
 ### Version Discovery
@@ -246,7 +261,7 @@ npx @modelcontextprotocol/inspector node src/index.js
 # Open http://localhost:5173
 
 # Run tests
-npm test 
+npm test
 
 # Run HTTP server locally
 npm run start:http
@@ -259,6 +274,12 @@ npm run start:http
 - **Node**: >=18
 - **Transport**: Both stdio (local) and HTTP/SSE (remote)
 - **Dependencies**: `js-yaml` for parsing, `node-jq` for querying, `node-fetch` for GitHub API
+
+## Release Process
+
+This project uses automated CI/CD workflows for releases to npm, Docker Hub, and GitHub Releases.
+
+📖 **[Release Documentation →](docs/RELEASING.md)**
 
 ## Links
 
