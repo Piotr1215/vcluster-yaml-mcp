@@ -29,7 +29,9 @@ export default defineConfig({
         // Exclude CLI files - bonus feature, not core MCP server
         'src/cli.js',
         'src/cli-handlers.js',
+        'src/cli-utils.js',
         'src/formatters.js',
+        'src/completions.js',
         // Exclude entry points and optional features
         'src/index.js',
         'src/http-server.js',

@@ -30,6 +30,24 @@ export async function readStdin() {
 export async function readContentSource(file) {
   // Read from stdin if no file provided or file is '-'
   if (!file || file === '-') {
+    // If no file argument provided (not even '-'), check if we're in interactive mode
+    // In interactive mode (TTY), we should not wait for stdin
+    if (!file) {
+      // stdin.isTTY is true when running in interactive terminal
+      // stdin.isTTY is false/undefined when piping or redirecting
+      const isInteractive = stdin.isTTY === true;
+
+      if (isInteractive) {
+        throw new Error(
+          'No input provided. Please specify a file or pipe content via stdin.\n' +
+          'Examples:\n' +
+          '  vcluster-yaml validate my-config.yaml\n' +
+          '  cat my-config.yaml | vcluster-yaml validate -\n' +
+          '  vcluster-yaml validate --help'
+        );
+      }
+    }
+
     const content = await readStdin();
     return { content, source: 'stdin' };
   }

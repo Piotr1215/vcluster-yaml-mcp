@@ -81,9 +81,13 @@ vcluster-yaml query sync --format table
 vcluster-yaml validate my-config.yaml
 cat my-config.yaml | vcluster-yaml validate -
 vcluster-yaml validate my-config.yaml --schema-version v0.24.0
+
+# Shell completion (bash/zsh)
+vcluster-yaml completion bash 2>/dev/null > ~/.vcluster-yaml-completion.bash
+vcluster-yaml completion zsh 2>/dev/null > ~/.zsh/completion/_vcluster-yaml
 ```
 
-📖 **[Full CLI Documentation →](docs/CLI.md)**
+📖 **[Full CLI Documentation →](docs/CLI.md)** 
 
 ## Available Tools
 
