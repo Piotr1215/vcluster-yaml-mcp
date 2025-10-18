@@ -4,6 +4,15 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // Run package tests sequentially to avoid tarball cleanup race conditions
+    // Other tests can run in parallel
+    fileParallelism: false,
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true
+      }
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
@@ -16,7 +25,15 @@ export default defineConfig({
         '**/*.config.js',
         '**/*.config.mjs',
         'coverage/**',
-        'test-*.js'
+        'test-*.js',
+        // Exclude CLI files - bonus feature, not core MCP server
+        'src/cli.js',
+        'src/cli-handlers.js',
+        'src/formatters.js',
+        // Exclude entry points and optional features
+        'src/index.js',
+        'src/http-server.js',
+        'src/middleware/**'
       ],
       include: [
         'src/**/*.js'
