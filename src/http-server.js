@@ -31,7 +31,8 @@ const mcpRequestDuration = new promClient.Histogram({
 const app = express();
 
 // Trust proxy (Cloudflare Tunnel)
-app.set('trust proxy', true);
+// Trust exactly 1 proxy hop (cloudflared)
+app.set('trust proxy', 1);
 
 // Security headers
 app.use((req, res, next) => {
