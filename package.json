@@ -1,6 +1,6 @@
 {
   "name": "vcluster-yaml-mcp-server",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "MCP server for querying vcluster YAML configurations using jq",
   "main": "src/index.js",
   "type": "module",
