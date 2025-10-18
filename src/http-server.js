@@ -5,9 +5,28 @@ import { createServer } from './server.js';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireApiKey } from './middleware/auth.js';
+import promClient from 'prom-client';
 
 const PORT = process.env.PORT || 3000;
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
+
+// Prometheus metrics setup
+const register = new promClient.Registry();
+promClient.collectDefaultMetrics({ register });
+
+const mcpRequestCounter = new promClient.Counter({
+  name: 'mcp_requests_total',
+  help: 'Total MCP requests',
+  labelNames: ['method', 'status'],
+  registers: [register]
+});
+
+const mcpRequestDuration = new promClient.Histogram({
+  name: 'mcp_request_duration_seconds',
+  help: 'MCP request duration in seconds',
+  labelNames: ['method'],
+  registers: [register]
+});
 
 const app = express();
 
@@ -53,6 +72,12 @@ app.get('/health', apiLimiter, (_req, res) => {
   });
 });
 
+// Prometheus metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
 // Root endpoint info
 app.get('/', (_req, res) => {
   res.json({
@@ -61,7 +86,8 @@ app.get('/', (_req, res) => {
     description: 'MCP server for querying vCluster YAML configurations',
     endpoints: {
       mcp: '/mcp',
-      health: '/health'
+      health: '/health',
+      metrics: '/metrics'
     },
     documentation: 'https://github.com/Piotr1215/vcluster-yaml-mcp-server'
   });
@@ -69,22 +95,32 @@ app.get('/', (_req, res) => {
 
 // MCP endpoint with Streamable HTTP transport
 const mcpHandler = async (req, res) => {
+  const start = Date.now();
   console.log(`MCP ${req.method} request received`);
 
-  // Create new transport per request to prevent ID collisions
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true
-  });
+  try {
+    // Create new transport per request to prevent ID collisions
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true
+    });
 
-  // Cleanup on connection close
-  res.on('close', () => {
-    transport.close();
-  });
+    // Cleanup on connection close
+    res.on('close', () => {
+      transport.close();
+    });
 
-  const server = createServer();
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
+    const server = createServer();
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+
+    mcpRequestCounter.inc({ method: req.method, status: 'success' });
+  } catch (error) {
+    mcpRequestCounter.inc({ method: req.method, status: 'error' });
+    throw error;
+  } finally {
+    mcpRequestDuration.observe({ method: req.method }, (Date.now() - start) / 1000);
+  }
 };
 
 // Support both GET and POST for MCP endpoint
