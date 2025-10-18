@@ -30,6 +30,9 @@ const mcpRequestDuration = new promClient.Histogram({
 
 const app = express();
 
+// Trust proxy (Cloudflare Tunnel)
+app.set('trust proxy', true);
+
 // Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -96,7 +99,8 @@ app.get('/', (_req, res) => {
 // MCP endpoint with Streamable HTTP transport
 const mcpHandler = async (req, res) => {
   const start = Date.now();
-  console.log(`MCP ${req.method} request received`);
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  console.log(`MCP ${req.method} request from ${clientIp}`);
 
   try {
     // Create new transport per request to prevent ID collisions
