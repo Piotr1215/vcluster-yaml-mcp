@@ -7,16 +7,27 @@
  */
 
 import { Command } from 'commander';
+import { readFile } from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { handleQuery, handleListVersions, handleValidate } from './cli-handlers.js';
 import { formatOutput } from './formatters.js';
 import { readContentSource } from './cli-utils.js';
+import { generateBashCompletion, generateZshCompletion, getInstallInstructions } from './completions.js';
+
+// Get package.json version
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  await readFile(join(__dirname, '../package.json'), 'utf-8')
+);
 
 const program = new Command();
 
 program
   .name('vcluster-yaml')
   .description('vCluster YAML configuration CLI')
-  .version('0.1.0');
+  .version(packageJson.version);
 
 // Query command
 program
@@ -162,6 +173,47 @@ Examples:
       console.error(`Error: ${error.message}`);
       process.exit(1);
     }
+  });
+
+// Completion command
+program
+  .command('completion <shell>')
+  .description('Generate shell completion script')
+  .addHelpText('after', `
+Supported shells:
+  bash    Bash completion script
+  zsh     Zsh completion script
+
+Examples:
+  $ vcluster-yaml completion bash > ~/.vcluster-yaml-completion.bash
+  $ vcluster-yaml completion zsh > ~/.zsh/completion/_vcluster-yaml
+  $ vcluster-yaml completion bash --help
+  `)
+  .action((shell) => {
+    const validShells = ['bash', 'zsh'];
+
+    if (!validShells.includes(shell)) {
+      console.error(`Error: Unsupported shell "${shell}". Supported shells: ${validShells.join(', ')}`);
+      console.error('');
+      console.error('Examples:');
+      console.error('  vcluster-yaml completion bash > ~/.vcluster-yaml-completion.bash');
+      console.error('  vcluster-yaml completion zsh > ~/.zsh/completion/_vcluster-yaml');
+      process.exit(1);
+    }
+
+    let script;
+    if (shell === 'bash') {
+      script = generateBashCompletion();
+    } else if (shell === 'zsh') {
+      script = generateZshCompletion();
+    }
+
+    // Output the script
+    console.log(script);
+
+    // Add installation instructions to stderr so they don't end up in the script
+    console.error('');
+    console.error(getInstallInstructions(shell));
   });
 
 // Parse arguments

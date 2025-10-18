@@ -17,8 +17,9 @@ describe('Version Consistency', () => {
       { encoding: 'utf-8' }
     ).trim();
 
-    // Current package.json version is 0.1.0
-    expect(version).toBe('0.1.0');
+    // Read actual version from package.json
+    const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, 'utf-8'));
+    expect(version).toBe(packageJson.version);
 
     // Verify semantic version format
     expect(version).toMatch(/^\d+\.\d+\.\d+$/);
