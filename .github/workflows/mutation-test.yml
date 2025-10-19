@@ -1,0 +1,57 @@
+name: Mutation Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      ignoreStatic:
+        description: 'Skip static mutants (faster)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  mutation-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run unit tests first
+      run: npm test
+
+    - name: Run mutation tests
+      run: npm run test:mutation
+      continue-on-error: false
+
+    - name: Upload mutation report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mutation-report
+        path: reports/mutation/
+        retention-days: 30
+
+    - name: Comment on workflow run
+      if: always()
+      run: |
+        echo "## Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Baseline: ~54-55% mutation score" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "See uploaded artifacts for detailed HTML report." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Thresholds:**" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ High: 80%" >> $GITHUB_STEP_SUMMARY
+        echo "- ⚠️ Low: 60%" >> $GITHUB_STEP_SUMMARY
+        echo "- ❌ Break: 50%" >> $GITHUB_STEP_SUMMARY
