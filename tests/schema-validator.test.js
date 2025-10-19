@@ -83,25 +83,33 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
     it('should detect non-existent paths and suggest alternatives', () => {
       const schema = {
         properties: {
-          correctPath: { type: 'string' },
-          anotherPath: { type: 'string' }
+          apiVersion: { type: 'string' },
+          apiTimeout: { type: 'number' }
         }
       };
 
       const config = {
-        wrongPath: 'value'
+        version: 'value' // partial match: "version" is substring of "apiVersion"
       };
 
       const result = validateConfigAgainstSchema(config, schema, 'v1.0.0');
       expect(result.schema_valid).toBe(false);
       expect(result.errors[0]).toMatchObject({
-        path: 'wrongPath',
+        path: 'version',
         severity: 'error'
       });
+
       // MUTATION FIX: Verify actual error message content
       expect(result.errors[0].error).toContain('does not exist');
-      expect(result.errors[0].suggestion).toContain('wrongPath');
+      expect(result.errors[0].suggestion).toContain('version');
       expect(result.errors[0].suggestion).toContain('not found');
+
+      // MUTATION FIX: Verify findSimilarPaths() actually suggests similar paths
+      // This catches the mutant where findSimilarPaths() body is removed
+      // "version" is substring of "apiVersion", should be suggested with score 5
+      expect(result.errors[0].correct_alternatives).toBeDefined();
+      expect(result.errors[0].correct_alternatives.length).toBeGreaterThan(0);
+      expect(result.errors[0].correct_alternatives).toContain('apiVersion');
     });
 
     it('QUIRK: additionalProperties are validated at nested level', () => {
