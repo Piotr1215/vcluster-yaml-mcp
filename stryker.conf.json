@@ -11,7 +11,8 @@
   "timeoutMS": 60000,
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
-  "maxConcurrentTestRunners": 2,
+  "concurrency": 2,
+  "ignoreStatic": true,
   "thresholds": {
     "high": 80,
     "low": 60,
