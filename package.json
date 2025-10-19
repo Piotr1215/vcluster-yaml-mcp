@@ -23,6 +23,8 @@
     "test:mutation": "stryker run",
     "test:perf": "vitest run tests/performance.test.js",
     "test:ci": "vitest run tests/ci/",
+    "complexity": "eslint --config eslint.config.complexity.js src/**/*.js",
+    "complexity:json": "eslint --config eslint.config.complexity.js --format json --output-file reports/complexity.json src/**/*.js || true",
     "lint:workflows": "actionlint .github/workflows/*.yml"
   },
   "dependencies": {
@@ -46,6 +48,7 @@
     "@stryker-mutator/core": "^9.2.0",
     "@stryker-mutator/vitest-runner": "^9.2.0",
     "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.38.0",
     "execa": "^9.5.2",
     "fast-check": "^4.3.0",
     "json-schema-library": "^10.3.0",
