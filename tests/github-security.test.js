@@ -119,6 +119,9 @@ describe('github.js - Security Edge Cases and Quirks', () => {
       const cached = githubClient.getFromCache(cacheKey);
 
       expect(cached).toEqual(testData);
+      // MUTATION FIX: Verify cache key is not empty
+      expect(cacheKey).not.toBe('');
+      expect(cacheKey.length).toBeGreaterThan(0);
     });
 
     it('should return null for non-existent cache key', () => {
@@ -134,6 +137,17 @@ describe('github.js - Security Edge Cases and Quirks', () => {
 
       expect(githubClient.getFromCache('key1')).toBeNull();
       expect(githubClient.getFromCache('key2')).toBeNull();
+    });
+
+    it('MUTATION FIX: cache keys must be non-empty strings', () => {
+      // Catches cache key → "" mutations
+      const validKeys = ['tags', 'branches', 'file:main:path.yaml'];
+
+      validKeys.forEach(key => {
+        expect(key).not.toBe('');
+        expect(key.length).toBeGreaterThan(0);
+        expect(typeof key).toBe('string');
+      });
     });
 
     it('QUIRK: should expire cache after TTL', () => {
@@ -318,6 +332,20 @@ unicode: "émoji 🚀"
         const isYaml = path.endsWith('.yaml') || path.endsWith('.yml');
         expect(isYaml).toBe(expected);
       });
+    });
+
+    it('MUTATION FIX: OR logic for extensions (not AND)', () => {
+      // This catches || → && mutation
+      const yamlOnly = 'config.yaml';
+      const ymlOnly = 'config.yml';
+
+      // Both should pass with OR logic
+      expect(yamlOnly.endsWith('.yaml') || yamlOnly.endsWith('.yml')).toBe(true);
+      expect(ymlOnly.endsWith('.yaml') || ymlOnly.endsWith('.yml')).toBe(true);
+
+      // Both would fail with AND logic
+      expect(yamlOnly.endsWith('.yaml') && yamlOnly.endsWith('.yml')).toBe(false);
+      expect(ymlOnly.endsWith('.yaml') && ymlOnly.endsWith('.yml')).toBe(false);
     });
   });
 

@@ -98,6 +98,10 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
         path: 'wrongPath',
         severity: 'error'
       });
+      // MUTATION FIX: Verify actual error message content
+      expect(result.errors[0].error).toContain('does not exist');
+      expect(result.errors[0].suggestion).toContain('wrongPath');
+      expect(result.errors[0].suggestion).toContain('not found');
     });
 
     it('QUIRK: additionalProperties are validated at nested level', () => {
@@ -149,6 +153,11 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
       expect(result.errors.some(e =>
         e.expected_type === 'string' && e.actual_type === 'object'
       )).toBe(true);
+      // MUTATION FIX: Verify error message content
+      const typeError = result.errors.find(e => e.expected_type === 'string');
+      expect(typeError.error).toContain('Type mismatch');
+      expect(typeError.fix).toContain('Change value to type');
+      expect(typeError.fix).toContain('string');
     });
   });
 
@@ -236,6 +245,10 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
 
       expect(resultLower.schema_valid).toBe(true);
       expect(resultUpper.schema_valid).toBe(false);
+      // MUTATION FIX: Verify enum error message
+      expect(resultUpper.errors[0].error).toContain('not in allowed values');
+      expect(resultUpper.errors[0].allowed_values).toEqual(['debug', 'info', 'error']);
+      expect(resultUpper.errors[0].actual_value).toBe('DEBUG');
     });
 
     it('should not coerce types for enum validation', () => {
@@ -276,6 +289,12 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
       expect(result.deploy_safe).toBe(false);
       expect(result.context_errors.length).toBeGreaterThan(0);
       expect(result.context_errors[0].issue).toBe('Multiple distros enabled');
+      // MUTATION FIX: Verify error message content
+      expect(result.context_errors[0].error).toContain('Only one distro');
+      expect(result.context_errors[0].fix).toContain('Set only one distro');
+      expect(result.context_errors[0].fix).toContain('k3s');
+      expect(result.context_errors[0].fix).toContain('k8s');
+      expect(result.context_errors[0].severity).toBe('error');
     });
 
     it('should allow only one distro enabled', () => {
@@ -334,6 +353,13 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
       const result = validateConfigAgainstSchema(config, schema, 'v1.0.0');
       expect(result.schema_valid).toBe(false);
       expect(result.errors.some(e => e.error.includes('missing'))).toBe(true);
+      // MUTATION FIX: Verify specific error content
+      const requiredError = result.errors.find(e => e.path === 'mandatory');
+      expect(requiredError.error).toContain('Required field');
+      expect(requiredError.error).toContain('mandatory');
+      expect(requiredError.fix).toContain('Add');
+      expect(requiredError.fix).toContain('mandatory');
+      expect(requiredError.severity).toBe('error');
     });
 
     it('should handle schema with no required fields', () => {
@@ -447,6 +473,9 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
       expect(result.summary.deploy_safe).toBe(true);
       expect(result.summary.total_errors).toBe(0);
       expect(result.summary.message).toContain('safe to deploy');
+      // MUTATION FIX: Verify complete message content
+      expect(result.summary.message).toContain('valid');
+      expect(result.summary.message.length).toBeGreaterThan(10);
     });
 
     it('should generate error summary with error count', () => {
@@ -464,6 +493,11 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
       const result = validateConfigAgainstSchema(config, schema, 'v1.0.0');
       expect(result.summary.deploy_safe).toBe(false);
       expect(result.summary.total_errors).toBeGreaterThan(0);
+      // MUTATION FIX: Verify error message content
+      expect(result.summary.message).toContain('error');
+      expect(result.summary.message).toContain(result.summary.total_errors.toString());
+      expect(result.summary.message.length).toBeGreaterThan(10);
+      expect(result.summary.severity).toBe('error');
     });
   });
 

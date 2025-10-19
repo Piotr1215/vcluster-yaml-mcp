@@ -141,18 +141,4 @@ describe('Smart Query Performance Tests', () => {
     console.log('');
   }, 60000);
 
-  it('Performance Summary', () => {
-    console.log('\n=== Performance Test Summary ===');
-    console.log('Tests completed. Review output above for timing data.');
-    console.log('');
-    console.log('Expected bottlenecks:');
-    console.log('1. JSON.stringify() on large objects');
-    console.log('2. No YAML content caching (re-parsing on every query)');
-    console.log('');
-    console.log('Next steps:');
-    console.log('1. Add detailed timing instrumentation to smart-query');
-    console.log('2. Measure: fetch time, parse time, search time, format time');
-    console.log('3. Confirm JSON.stringify and YAML parsing are bottlenecks');
-    console.log('4. Implement fixes and re-test');
-  });
 });
