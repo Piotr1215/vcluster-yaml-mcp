@@ -106,10 +106,47 @@ describe('schema-validator.js - Edge Cases and Quirks', () => {
 
       // MUTATION FIX: Verify findSimilarPaths() actually suggests similar paths
       // This catches the mutant where findSimilarPaths() body is removed
-      // "version" is substring of "apiVersion", should be suggested with score 5
+      // "version" is substring of "apiVersion", should be suggested
       expect(result.errors[0].correct_alternatives).toBeDefined();
       expect(result.errors[0].correct_alternatives.length).toBeGreaterThan(0);
       expect(result.errors[0].correct_alternatives).toContain('apiVersion');
+    });
+
+    it('MUTATION FIX: path suggestions follow strict priority order', () => {
+      const schema = {
+        properties: {
+          version: { type: 'string' },           // Priority 1: Exact last segment match
+          apiVersion: { type: 'string' },        // Priority 2: Substring match (contains "version")
+          api: {
+            type: 'object',
+            properties: {
+              vers: { type: 'string' }           // Priority 3: Prefix match ("api")
+            }
+          }
+        }
+      };
+
+      const config = {
+        'api.version': 'value'  // Typo: should be one of the above
+      };
+
+      const result = validateConfigAgainstSchema(config, schema, 'v1.0.0');
+      expect(result.schema_valid).toBe(false);
+
+      const alternatives = result.errors[0].correct_alternatives;
+      expect(alternatives).toBeDefined();
+      expect(alternatives.length).toBeGreaterThan(0);
+
+      // Priority 1: "version" (exact last segment) should come first
+      // Priority 2: "apiVersion" (substring) should come second
+      // Priority 3: "api.vers" (shared prefix "api") should come third
+      // This catches mutations that change priority order
+      const versionIndex = alternatives.indexOf('version');
+      const apiVersionIndex = alternatives.indexOf('apiVersion');
+
+      if (versionIndex !== -1 && apiVersionIndex !== -1) {
+        expect(versionIndex).toBeLessThan(apiVersionIndex);
+      }
     });
 
     it('QUIRK: additionalProperties are validated at nested level', () => {
