@@ -1,9 +1,10 @@
 # vCluster YAML MCP Server
 
 [![npm version](https://img.shields.io/npm/v/vcluster-yaml-mcp-server.svg)](https://www.npmjs.com/package/vcluster-yaml-mcp-server)
+[![codecov](https://codecov.io/gh/Piotr1215/vcluster-yaml-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/Piotr1215/vcluster-yaml-mcp-server)
+[![Node.js](https://img.shields.io/badge/node-18%20%7C%2020%20%7C%2022-brightgreen)](https://nodejs.org/)
+[![Response Time](https://img.shields.io/badge/response-<100ms-brightgreen)](https://github.com/Piotr1215/vcluster-yaml-mcp-server#token-optimization)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
-[![Tests](https://github.com/Piotr1215/vcluster-yaml-mcp-server/actions/workflows/test.yml/badge.svg)](https://github.com/Piotr1215/vcluster-yaml-mcp-server/actions/workflows/test.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/piotrzan/vcluster-yaml-mcp-server.svg)](https://hub.docker.com/r/piotrzan/vcluster-yaml-mcp-server)
 [![MCP](https://img.shields.io/badge/MCP-Server-blue.svg)](https://modelcontextprotocol.io)
 
