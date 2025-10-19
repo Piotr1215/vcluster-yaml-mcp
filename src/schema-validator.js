@@ -153,50 +153,79 @@ function validatePath(path, value, schema) {
 }
 
 /**
- * Find similar paths in schema for suggestions
+ * Find similar paths using priority-based matching (no magic numbers)
+ * Priority 1: Exact match on last segment (e.g., "version" matches "apiVersion")
+ * Priority 2: Substring match (e.g., "vers" matches "apiVersion")
+ * Priority 3: Shared prefix (e.g., "api.vers" matches "api.version")
  */
 function findSimilarPaths(targetPath, schema, maxSuggestions = 3) {
   const allPaths = extractSchemaPaths(schema);
+  if (allPaths.length === 0) return [];
+
   const targetParts = targetPath.toLowerCase().split('.');
   const targetLast = targetParts[targetParts.length - 1];
 
-  const scored = allPaths.map(schemaPath => {
+  // Categorize matches by clear priorities (no arbitrary scoring)
+  const exactMatches = [];
+  const substringMatches = [];
+  const prefixMatches = [];
+
+  for (const schemaPath of allPaths) {
     const parts = schemaPath.toLowerCase().split('.');
     const last = parts[parts.length - 1];
 
-    let score = 0;
-    if (last === targetLast) score += 10;
-    if (last.includes(targetLast) || targetLast.includes(last)) score += 5;
+    // Priority 1: Exact last segment match
+    if (last === targetLast) {
+      exactMatches.push(schemaPath);
+      continue;
+    }
 
-    // Shared prefix
-    const sharedPrefix = getSharedPrefix(targetParts, parts);
-    score += sharedPrefix * 2;
+    // Priority 2: Substring match in last segment
+    if (last.includes(targetLast) || targetLast.includes(last)) {
+      substringMatches.push(schemaPath);
+      continue;
+    }
 
-    return { path: schemaPath, score };
-  });
+    // Priority 3: Shared path prefix
+    const sharedPrefixLength = getSharedPrefix(targetParts, parts);
+    if (sharedPrefixLength > 0) {
+      prefixMatches.push({ path: schemaPath, prefixLength: sharedPrefixLength });
+    }
+  }
 
-  return scored
-    .filter(s => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxSuggestions)
-    .map(s => s.path);
+  // Sort prefix matches by shared prefix length (longer is better)
+  prefixMatches.sort((a, b) => b.prefixLength - a.prefixLength);
+
+  // Combine in strict priority order
+  const suggestions = [
+    ...exactMatches,
+    ...substringMatches,
+    ...prefixMatches.map(m => m.path)
+  ];
+
+  return suggestions.slice(0, maxSuggestions);
 }
 
 /**
  * Extract all paths from schema
+ * Contract: schema must be an object with optional .properties field
  */
 function extractSchemaPaths(schema, prefix = '') {
+  if (!schema || typeof schema !== 'object') {
+    return [];
+  }
+
   const paths = [];
+  // Explicit contract: use .properties if present, otherwise treat schema as properties object
   const props = schema.properties || schema;
 
-  if (props && typeof props === 'object') {
-    for (const [key, value] of Object.entries(props)) {
-      const path = prefix ? `${prefix}.${key}` : key;
-      paths.push(path);
+  for (const [key, value] of Object.entries(props)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    paths.push(path);
 
-      if (value && value.properties) {
-        paths.push(...extractSchemaPaths(value, path));
-      }
+    // Recurse if nested properties exist
+    if (value && typeof value === 'object' && value.properties) {
+      paths.push(...extractSchemaPaths(value, path));
     }
   }
 
