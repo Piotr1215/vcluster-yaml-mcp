@@ -1,5 +1,12 @@
 # vCluster YAML MCP Server
 
+[![npm version](https://img.shields.io/npm/v/vcluster-yaml-mcp-server.svg)](https://www.npmjs.com/package/vcluster-yaml-mcp-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
+[![Tests](https://github.com/Piotr1215/vcluster-yaml-mcp-server/actions/workflows/test.yml/badge.svg)](https://github.com/Piotr1215/vcluster-yaml-mcp-server/actions/workflows/test.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/piotrzan/vcluster-yaml-mcp-server.svg)](https://hub.docker.com/r/piotrzan/vcluster-yaml-mcp-server)
+[![MCP](https://img.shields.io/badge/MCP-Server-blue.svg)](https://modelcontextprotocol.io)
+
 A Model Context Protocol (MCP) server that lets AI assistants query and validate [vCluster](https://github.com/loft-sh/vcluster) YAML configurations directly from GitHub.
 
 ## What Does It Do?
