@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createServer } from '../src/server.js';
+import { createServer } from '../../src/server.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
