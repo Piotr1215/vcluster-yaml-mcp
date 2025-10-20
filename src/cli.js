@@ -35,12 +35,12 @@ program
   .description('Search for vCluster configuration fields')
   .option('--file <file>', 'Configuration file to search', 'chart/values.yaml')
   .option('-s, --schema-version <version>', 'vCluster version or branch', 'main')
-  .option('-f, --format <format>', 'Output format (json, yaml, table)', 'json')
+  .option('-f, --format <format>', 'Output format: json, yaml, table (default: table)', 'table')
   .addHelpText('after', `
 Examples:
   $ vcluster-yaml query sync
   $ vcluster-yaml query sync --schema-version v0.24.0
-  $ vcluster-yaml query "controlPlane.replicas" --format table
+  $ vcluster-yaml query "controlPlane.replicas"
   `)
   .action(async (query, options) => {
     try {
@@ -84,7 +84,7 @@ Examples:
 program
   .command('list-versions')
   .description('List available vCluster versions')
-  .option('-f, --format <format>', 'Output format (json, yaml, table)', 'json')
+  .option('-f, --format <format>', 'Output format: json, yaml, table (default: table)', 'table')
   .action(async (options) => {
     try {
       // Validate format option
@@ -118,7 +118,7 @@ program
   .command('validate [file]')
   .description('Validate vCluster configuration')
   .option('-s, --schema-version <version>', 'vCluster version for schema', 'main')
-  .option('-f, --format <format>', 'Output format (json, yaml, table)', 'json')
+  .option('-f, --format <format>', 'Output format: json, yaml, table (default: table)', 'table')
   .addHelpText('after', `
 Arguments:
   file                   YAML file to validate (use '-' for stdin, omit to read from stdin)
@@ -128,7 +128,6 @@ Examples:
   $ vcluster-yaml validate vcluster.yaml --schema-version v0.24.0
   $ cat vcluster.yaml | vcluster-yaml validate -
   $ vcluster-yaml validate - < vcluster.yaml
-  $ vcluster-yaml validate vcluster.yaml --format table
   `)
   .action(async (file, options) => {
     try {
