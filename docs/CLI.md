@@ -12,17 +12,18 @@ The package provides multiple installation methods to suit different workflows:
 npm install -g vcluster-yaml-mcp-server
 
 # After installation, use the vcluster-yaml command
-vcluster-yaml query sync --format table
+vcluster-yaml query sync
 ```
 
 ### Option 2: Use directly with npx (no installation)
 
 ```bash
-# Syntax: npx -p <package-name> <binary-name> <command> [options]
-npx -p vcluster-yaml-mcp-server vcluster-yaml query sync --format table
-```
+# Simple - package name matches the binary
+npx vcluster-yaml-mcp-server query sync
 
-> **Note:** When using npx, you must use `-p` to specify the package name and then call the `vcluster-yaml` binary, since the package contains multiple binaries.
+# Alternative: use the shorter binary name (requires -p flag)
+npx -p vcluster-yaml-mcp-server vcluster-yaml query sync
+```
 
 ### Option 3: Install locally in a project
 
@@ -31,7 +32,7 @@ npx -p vcluster-yaml-mcp-server vcluster-yaml query sync --format table
 npm install vcluster-yaml-mcp-server
 
 # Use via npx within the project
-npx vcluster-yaml query sync --format table
+npx vcluster-yaml query sync
 
 # Or access the binary directly
 ./node_modules/.bin/vcluster-yaml query sync
@@ -57,13 +58,13 @@ cd vcluster-yaml-mcp-server
 npm install
 
 # Run CLI directly with node
-node src/cli.js query sync --format table
+node src/cli.js query sync
 node src/cli.js list-versions
 node src/cli.js validate vcluster.yaml
 
 # Or link locally to test as if globally installed
 npm link
-vcluster-yaml query sync --format table
+vcluster-yaml query sync
 ```
 
 ## CLI Commands
@@ -82,11 +83,14 @@ vcluster-yaml query "controlPlane" --schema-version v0.24.0
 # Search in a specific file
 vcluster-yaml query etcd --file chart/values.yaml
 
-# Output as table (default: json)
-vcluster-yaml query replicas --format table
+# Output as JSON
+vcluster-yaml query replicas --format json
 
 # Output as YAML
 vcluster-yaml query "high availability" --format yaml
+
+# Table format (default)
+vcluster-yaml query replicas
 ```
 
 **Example Output (JSON):**
@@ -128,8 +132,8 @@ List all available vCluster versions:
 # List all versions (JSON)
 vcluster-yaml list-versions
 
-# List as table
-vcluster-yaml list-versions --format table
+# List as table (default)
+vcluster-yaml list-versions
 
 # List as YAML
 vcluster-yaml list-versions --format yaml
@@ -161,8 +165,8 @@ vcluster-yaml validate vcluster.yaml --schema-version v0.24.0
 # Validate from stdin
 cat vcluster.yaml | vcluster-yaml validate -
 
-# Output as table for better readability
-vcluster-yaml validate vcluster.yaml --format table
+# Validate with default table format
+vcluster-yaml validate vcluster.yaml
 
 # Validate from stdin using redirection
 vcluster-yaml validate - < vcluster.yaml
@@ -218,7 +222,7 @@ The CLI follows standard POSIX exit code conventions:
 
 ```bash
 # Fast way to check a specific setting without AI
-vcluster-yaml query "sync.toHost.pods" --format table
+vcluster-yaml query "sync.toHost.pods"
 ```
 
 ### CI/CD Validation
