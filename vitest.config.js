@@ -13,6 +13,10 @@ export default defineConfig({
         singleFork: true
       }
     },
+    exclude: [
+      'node_modules/**',
+      '.claude/**'
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
