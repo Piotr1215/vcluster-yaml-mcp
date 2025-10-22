@@ -1,5 +1,25 @@
 FROM node:20-alpine
 
+# Build arguments for version information
+ARG IMAGE_VERSION=unknown
+ARG GIT_SHA=unknown
+ARG BUILD_DATE=unknown
+
+# OCI labels for image metadata
+LABEL org.opencontainers.image.title="vcluster-yaml-mcp-server"
+LABEL org.opencontainers.image.description="MCP server for querying vCluster YAML configurations"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.source="https://github.com/Piotr1215/vcluster-yaml-mcp-server"
+LABEL org.opencontainers.image.url="https://github.com/Piotr1215/vcluster-yaml-mcp-server"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Set environment variables from build args
+ENV IMAGE_VERSION=${IMAGE_VERSION}
+ENV GIT_SHA=${GIT_SHA}
+ENV BUILD_DATE=${BUILD_DATE}
+
 WORKDIR /app
 
 # Copy package files

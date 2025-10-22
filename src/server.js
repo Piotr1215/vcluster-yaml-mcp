@@ -1,17 +1,21 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListToolsRequestSchema,
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema
+} from '@modelcontextprotocol/sdk/types.js';
 import { githubClient } from './github.js';
 import { executeToolHandler } from './tool-registry.js';
+import { getMcpServerInfo, getServerInfo } from './server-info.js';
 
 export function createServer() {
   const server = new Server(
-    {
-      name: 'vcluster-yaml-mcp-server',
-      version: '0.1.0'
-    },
+    getMcpServerInfo(),
     {
       capabilities: {
-        tools: {}
+        tools: {},
+        resources: {}
       }
     }
   );
@@ -126,6 +130,38 @@ export function createServer() {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     return executeToolHandler(name, args, githubClient);
+  });
+
+  // Resource handlers
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return {
+      resources: [
+        {
+          uri: 'server://info',
+          name: 'Server Information',
+          description: 'Version, build info, and metadata about this MCP server',
+          mimeType: 'application/json'
+        }
+      ]
+    };
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const { uri } = request.params;
+
+    if (uri === 'server://info') {
+      return {
+        contents: [
+          {
+            uri: 'server://info',
+            mimeType: 'application/json',
+            text: JSON.stringify(getServerInfo(), null, 2)
+          }
+        ]
+      };
+    }
+
+    throw new Error(`Unknown resource: ${uri}`);
   });
 
   return server;

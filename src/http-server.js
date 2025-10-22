@@ -6,6 +6,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireApiKey } from './middleware/auth.js';
 import promClient from 'prom-client';
+import { getHealthInfo, getServerInfo } from './server-info.js';
 
 const PORT = process.env.PORT || 3000;
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
@@ -68,12 +69,7 @@ const mcpLimiter = rateLimit({
 
 // Health check endpoint
 app.get('/health', apiLimiter, (_req, res) => {
-  res.json({
-    status: 'ok',
-    name: 'vcluster-yaml-mcp-server',
-    version: '0.1.0',
-    timestamp: new Date().toISOString()
-  });
+  res.json(getHealthInfo());
 });
 
 // Prometheus metrics endpoint
@@ -85,15 +81,12 @@ app.get('/metrics', async (_req, res) => {
 // Root endpoint info
 app.get('/', (_req, res) => {
   res.json({
-    name: 'vcluster-yaml-mcp-server',
-    version: '0.1.0',
-    description: 'MCP server for querying vCluster YAML configurations',
+    ...getServerInfo(),
     endpoints: {
       mcp: '/mcp',
       health: '/health',
       metrics: '/metrics'
-    },
-    documentation: 'https://github.com/Piotr1215/vcluster-yaml-mcp-server'
+    }
   });
 });
 
