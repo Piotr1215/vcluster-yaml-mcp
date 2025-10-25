@@ -17,7 +17,7 @@ describe('VCluster YAML MCP Server', () => {
   describe('Server Creation', () => {
     it('should create server with correct metadata', () => {
       expect(server._serverInfo.name).toBe('vcluster-yaml-mcp-server');
-      expect(server._serverInfo.version).toBe('0.1.0');
+      expect(server._serverInfo.version).toBe('1.0.5');
     });
 
     it('should have tools capability', () => {

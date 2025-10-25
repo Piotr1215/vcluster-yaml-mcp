@@ -10,6 +10,20 @@ const REPO_NAME = 'vcluster';
 const cache = new Map();
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
+// Fetch timeout configuration
+const FETCH_TIMEOUT_MS = 30000; // 30 seconds - generous for large files
+
+// Helper to create fetch with timeout
+function createFetchWithTimeout(timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    signal: controller.signal,
+    cleanup: () => clearTimeout(timeoutId)
+  };
+}
+
 class GitHubClient {
   constructor() {
     this.defaultBranch = 'main';
@@ -21,12 +35,15 @@ class GitHubClient {
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
+    const { signal, cleanup } = createFetchWithTimeout();
+
     try {
       const response = await fetch(`${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}/tags`, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'vcluster-yaml-mcp-server'
-        }
+        },
+        signal
       });
 
       if (!response.ok) {
@@ -35,12 +52,18 @@ class GitHubClient {
 
       const tags = await response.json();
       const tagNames = tags.map(tag => tag.name);
-      
+
       this.setCache(cacheKey, tagNames);
       return tagNames;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('Request timeout: fetching tags took longer than 30s');
+        return [];
+      }
       console.error('Error fetching tags:', error);
       return [];
+    } finally {
+      cleanup();
     }
   }
 
@@ -50,12 +73,15 @@ class GitHubClient {
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
+    const { signal, cleanup } = createFetchWithTimeout();
+
     try {
       const response = await fetch(`${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}/branches`, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'vcluster-yaml-mcp-server'
-        }
+        },
+        signal
       });
 
       if (!response.ok) {
@@ -64,12 +90,18 @@ class GitHubClient {
 
       const branches = await response.json();
       const branchNames = branches.map(branch => branch.name);
-      
+
       this.setCache(cacheKey, branchNames);
       return branchNames;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('Request timeout: fetching branches took longer than 30s');
+        return ['main'];
+      }
       console.error('Error fetching branches:', error);
       return ['main'];
+    } finally {
+      cleanup();
     }
   }
 
@@ -90,12 +122,15 @@ class GitHubClient {
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
+    const { signal, cleanup } = createFetchWithTimeout();
+
     try {
       const url = `${GITHUB_RAW_BASE}/${REPO_OWNER}/${REPO_NAME}/${actualRef}/${path}`;
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'vcluster-yaml-mcp-server'
-        }
+        },
+        signal
       });
 
       if (!response.ok) {
@@ -109,7 +144,12 @@ class GitHubClient {
       this.setCache(cacheKey, content);
       return content;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Timeout: fetching ${path} took longer than 30s`);
+      }
       throw new Error(`Failed to fetch ${path}: ${error.message}`);
+    } finally {
+      cleanup();
     }
   }
 

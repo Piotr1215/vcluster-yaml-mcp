@@ -186,38 +186,48 @@ export async function handleListVersions(args, githubClient) {
 /**
  * Handle: smart-query
  * Pure function except for I/O
+ * CRITICAL: Must never fail - always return helpful results or fallback
  */
 export async function handleSmartQuery(args, githubClient) {
   const { query, version = 'main', file = 'chart/values.yaml' } = args;
 
-  const yamlData = await githubClient.getYamlContent(file, version);
-  const searchTerm = query.toLowerCase();
+  try {
+    const yamlData = await githubClient.getYamlContent(file, version);
+    const searchTerm = query.toLowerCase();
 
-  // Extract all paths (pure function)
-  const allInfo = extractYamlInfo(yamlData);
+    // Extract all paths (pure function)
+    const allInfo = extractYamlInfo(yamlData);
 
-  // Search (pure function)
-  const results = searchYaml(allInfo, searchTerm);
+    // Search (pure function)
+    const results = searchYaml(allInfo, searchTerm);
 
-  // Handle no matches
-  if (results.length === 0) {
-    const similarPaths = findSimilarPaths(allInfo, searchTerm);
-    const formatted = formatNoMatches({ query, fileName: file, version, similarPaths, yamlData });
+    // Handle no matches
+    if (results.length === 0) {
+      const similarPaths = findSimilarPaths(allInfo, searchTerm);
+      const formatted = formatNoMatches({ query, fileName: file, version, similarPaths, yamlData });
+      return buildSuccessResponse(formatted);
+    }
+
+    // Sort by relevance (pure function)
+    const sorted = sortByRelevance(results, searchTerm);
+
+    // Format results
+    const formatted = formatQueryResults(sorted, {
+      query,
+      fileName: file,
+      version,
+      maxResults: 50
+    });
+
     return buildSuccessResponse(formatted);
+  } catch (error) {
+    // Graceful fallback - always provide helpful message
+    const errorMsg = error.message.includes('Timeout')
+      ? `⏱️ Request timed out while fetching ${file} (version: ${version}).\n\n**Suggestions:**\n- Try a different version (e.g., "v0.29.1")\n- The file might be temporarily unavailable\n- Check if the file path is correct`
+      : `❌ Error searching for "${query}" in ${file} (version: ${version}):\n${error.message}\n\n**Suggestions:**\n- Try "list-versions" to see available versions\n- Verify the file path is correct`;
+
+    return buildSuccessResponse(errorMsg);
   }
-
-  // Sort by relevance (pure function)
-  const sorted = sortByRelevance(results, searchTerm);
-
-  // Format results
-  const formatted = formatQueryResults(sorted, {
-    query,
-    fileName: file,
-    version,
-    maxResults: 50
-  });
-
-  return buildSuccessResponse(formatted);
 }
 
 /**
@@ -227,10 +237,24 @@ export async function handleSmartQuery(args, githubClient) {
 export async function handleExtractRules(args, githubClient) {
   const { version = 'main', file = 'chart/values.yaml', section } = args;
 
-  const content = await githubClient.getFileContent(file, version);
-  const rules = extractValidationRulesFromComments(content, section);
+  try {
+    const content = await githubClient.getFileContent(file, version);
+    const rules = extractValidationRulesFromComments(content, section);
 
-  return buildSuccessResponse(JSON.stringify(rules, null, 2));
+    // Remove originalComments to reduce response size
+    const optimizedRules = {
+      ...rules,
+      rules: rules.rules.map(r => ({
+        path: r.path,
+        instructions: r.instructions
+      }))
+    };
+
+    // No pretty-printing to reduce size
+    return buildSuccessResponse(JSON.stringify(optimizedRules));
+  } catch (error) {
+    return buildErrorResponse(`Failed to extract validation rules: ${error.message}`);
+  }
 }
 
 /**
