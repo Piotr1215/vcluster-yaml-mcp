@@ -407,3 +407,70 @@ distro: k3s`;
     });
   });
 });
+
+describe('Error Handling', () => {
+  describe('handleSmartQuery error cases', () => {
+    it('should handle timeout errors gracefully', async () => {
+      const mockGithubClient = {
+        getYamlContent: vi.fn().mockRejectedValue(new Error('Timeout: fetching chart/values.yaml took longer than 30s'))
+      };
+
+      const response = await handleSmartQuery(
+        { query: 'test', version: 'main' },
+        mockGithubClient
+      );
+
+      expect(response.isError).toBe(false);
+      expect(response.content[0].text).toContain('⏱️');
+      expect(response.content[0].text).toContain('timed out');
+      expect(response.content[0].text).toContain('Suggestions');
+    });
+
+    it('should handle generic errors gracefully', async () => {
+      const mockGithubClient = {
+        getYamlContent: vi.fn().mockRejectedValue(new Error('Network failure'))
+      };
+
+      const response = await handleSmartQuery(
+        { query: 'test', version: 'main' },
+        mockGithubClient
+      );
+
+      expect(response.isError).toBe(false);
+      expect(response.content[0].text).toContain('❌');
+      expect(response.content[0].text).toContain('Error searching');
+      expect(response.content[0].text).toContain('Network failure');
+    });
+  });
+
+  describe('handleExtractRules error cases', () => {
+    it('should handle fetch errors gracefully', async () => {
+      const mockGithubClient = {
+        getFileContent: vi.fn().mockRejectedValue(new Error('File not found'))
+      };
+
+      const response = await handleExtractRules(
+        { version: 'main' },
+        mockGithubClient
+      );
+
+      expect(response.isError).toBe(true);
+      expect(response.content[0].text).toContain('Failed to extract validation rules');
+      expect(response.content[0].text).toContain('File not found');
+    });
+
+    it('should handle timeout errors', async () => {
+      const mockGithubClient = {
+        getFileContent: vi.fn().mockRejectedValue(new Error('Timeout: fetching chart/values.yaml took longer than 30s'))
+      };
+
+      const response = await handleExtractRules(
+        { version: 'main' },
+        mockGithubClient
+      );
+
+      expect(response.isError).toBe(true);
+      expect(response.content[0].text).toContain('Timeout');
+    });
+  });
+});

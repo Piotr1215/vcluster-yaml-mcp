@@ -15,7 +15,8 @@ export default defineConfig({
     },
     exclude: [
       'node_modules/**',
-      '.claude/**'
+      '.claude/**',
+      'test-installs/**'
     ],
     coverage: {
       provider: 'v8',
