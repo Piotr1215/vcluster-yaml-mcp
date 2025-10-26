@@ -104,6 +104,7 @@ const mcpHandler = async (req, res) => {
   const jsonrpcRequest = req.body;
   const mcpMethod = jsonrpcRequest?.method || 'unknown';
   const mcpId = jsonrpcRequest?.id;
+  const mcpParams = jsonrpcRequest?.params;
 
   return tracer.startActiveSpan('mcp.request', async (span) => {
     try {
@@ -113,6 +114,17 @@ const mcpHandler = async (req, res) => {
         span.setAttribute('mcp.id', mcpId);
       }
       span.setAttribute('http.client_ip', clientIp);
+
+      // Add tool-specific attributes for tools/call
+      if (mcpMethod === 'tools/call' && mcpParams?.name) {
+        span.setAttribute('mcp.tool.name', mcpParams.name);
+        span.updateName(`mcp.tool.${mcpParams.name}`);
+      }
+
+      // Add resource URI for resource operations
+      if ((mcpMethod === 'resources/read' || mcpMethod === 'resources/write') && mcpParams?.uri) {
+        span.setAttribute('mcp.resource.uri', mcpParams.uri);
+      }
 
       // Create new transport per request to prevent ID collisions
       const transport = new StreamableHTTPServerTransport({
