@@ -38,5 +38,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Run HTTP server
-CMD ["npm", "run", "start:http"]
+# Run HTTP server with OpenTelemetry instrumentation
+# Load instrumentation before the app using --import flag
+CMD ["node", "--import", "./src/instrumentation.js", "./src/http-server.js"]
