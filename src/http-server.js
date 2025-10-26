@@ -7,9 +7,13 @@ import rateLimit from 'express-rate-limit';
 import { requireApiKey } from './middleware/auth.js';
 import promClient from 'prom-client';
 import { getHealthInfo, getServerInfo } from './server-info.js';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 
 const PORT = process.env.PORT || 3000;
 const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
+
+// OpenTelemetry tracer
+const tracer = trace.getTracer('vcluster-yaml-mcp-server');
 
 // Prometheus metrics setup
 const register = new promClient.Registry();
@@ -96,29 +100,47 @@ const mcpHandler = async (req, res) => {
   const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   console.log(`MCP ${req.method} request from ${clientIp}`);
 
-  try {
-    // Create new transport per request to prevent ID collisions
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true
-    });
+  // Extract JSONRPC request details for tracing
+  const jsonrpcRequest = req.body;
+  const mcpMethod = jsonrpcRequest?.method || 'unknown';
+  const mcpId = jsonrpcRequest?.id;
 
-    // Cleanup on connection close
-    res.on('close', () => {
-      transport.close();
-    });
+  return tracer.startActiveSpan('mcp.request', async (span) => {
+    try {
+      // Add MCP-specific span attributes
+      span.setAttribute('mcp.method', mcpMethod);
+      if (mcpId !== undefined) {
+        span.setAttribute('mcp.id', mcpId);
+      }
+      span.setAttribute('http.client_ip', clientIp);
 
-    const server = createServer();
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+      // Create new transport per request to prevent ID collisions
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true
+      });
 
-    mcpRequestCounter.inc({ method: req.method, status: 'success' });
-  } catch (error) {
-    mcpRequestCounter.inc({ method: req.method, status: 'error' });
-    throw error;
-  } finally {
-    mcpRequestDuration.observe({ method: req.method }, (Date.now() - start) / 1000);
-  }
+      // Cleanup on connection close
+      res.on('close', () => {
+        transport.close();
+      });
+
+      const server = createServer();
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+
+      mcpRequestCounter.inc({ method: req.method, status: 'success' });
+      span.setStatus({ code: SpanStatusCode.OK });
+    } catch (error) {
+      mcpRequestCounter.inc({ method: req.method, status: 'error' });
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      span.recordException(error);
+      throw error;
+    } finally {
+      mcpRequestDuration.observe({ method: req.method }, (Date.now() - start) / 1000);
+      span.end();
+    }
+  });
 };
 
 // Support both GET and POST for MCP endpoint
