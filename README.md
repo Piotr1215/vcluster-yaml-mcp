@@ -52,7 +52,7 @@ Run the server locally via npx:
   "mcpServers": {
     "vcluster-yaml": {
       "command": "npx",
-      "args": ["-y", "vcluster-yaml-mcp-server"]
+      "args": ["-y", "vcluster-yaml-mcp-server@latest"]
     }
   }
 }
