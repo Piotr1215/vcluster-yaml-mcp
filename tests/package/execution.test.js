@@ -46,7 +46,7 @@ describe('Binary Execution', () => {
     expect(result.stdout).toContain('vcluster-yaml');
   }, 60000);
 
-  it('should execute vcluster-yaml-mcp server binary successfully', async () => {
+  it('should execute vcluster-yaml-mcp-server binary successfully', async () => {
     const testDir = await createTestDir();
     testDirs.push(testDir);
 
@@ -57,7 +57,7 @@ describe('Binary Execution', () => {
 
     // Execute the MCP binary with --help (non-destructive)
     // Note: MCP server may not support --help, so we test with --version or just verify it starts
-    const binPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp');
+    const binPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp-server');
 
     // MCP servers typically don't have CLI args, they start and wait for stdio
     // So we'll just verify the binary is executable and the file exists
@@ -91,7 +91,7 @@ describe('Binary Execution', () => {
     expect(cliResult.stdout).toContain('vcluster-yaml');
 
     // Verify MCP binary exists
-    const mcpBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp');
+    const mcpBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp-server');
     const mcpBinExists = await fs.access(mcpBinPath)
       .then(() => true)
       .catch(() => false);

@@ -63,7 +63,7 @@ describe('Package Installation', () => {
     expect(cliBinExists).toBe(true);
   }, 60000);
 
-  it('should create bin symlinks for vcluster-yaml-mcp (MCP server)', async () => {
+  it('should create bin symlinks for vcluster-yaml-mcp-server (MCP server)', async () => {
     const testDir = await createTestDir();
     testDirs.push(testDir);
 
@@ -73,7 +73,7 @@ describe('Package Installation', () => {
     await installLocal(tarballPath, testDir);
 
     // Check for MCP bin symlink
-    const mcpBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp');
+    const mcpBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp-server');
 
     const mcpBinExists = await fs.access(mcpBinPath)
       .then(() => true)
@@ -93,7 +93,7 @@ describe('Package Installation', () => {
 
     // Check for both bin symlinks
     const cliBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml');
-    const mcpBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp');
+    const mcpBinPath = join(testDir, 'node_modules', '.bin', 'vcluster-yaml-mcp-server');
 
     const cliBinExists = await fs.access(cliBinPath)
       .then(() => true)
@@ -121,7 +121,7 @@ describe('Package Installation', () => {
 
     // Verify binaries were installed in prefix/bin
     const cliBinPath = join(testDir, 'bin', 'vcluster-yaml');
-    const mcpBinPath = join(testDir, 'bin', 'vcluster-yaml-mcp');
+    const mcpBinPath = join(testDir, 'bin', 'vcluster-yaml-mcp-server');
 
     const cliBinExists = await fs.access(cliBinPath)
       .then(() => true)
