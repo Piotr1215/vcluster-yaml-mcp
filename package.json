@@ -5,8 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "vcluster-yaml-mcp-server": "./src/cli.js",
-    "vcluster-yaml-mcp": "./src/index.js",
+    "vcluster-yaml-mcp-server": "./src/index.js",
     "vcluster-yaml": "./src/cli.js"
   },
   "files": [
