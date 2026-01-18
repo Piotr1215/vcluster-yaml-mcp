@@ -287,10 +287,12 @@ npm run start:http
 
 ## Technical Details
 
-- **SDK**: `@modelcontextprotocol/sdk` v1.20.1 (Streamable HTTP transport)
+- **SDK**: `@modelcontextprotocol/sdk` v1.25.2 using `McpServer` high-level API
 - **Node**: >=18
 - **Transport**: Both stdio (local) and HTTP/SSE (remote)
 - **Dependencies**: `js-yaml` for parsing, `node-jq` for querying, `node-fetch` for GitHub API
+- **Tool Annotations**: All tools include `readOnlyHint`/`destructiveHint` for client optimization
+- **Server Instructions**: Includes instructions for MCP tool search auto mode
 
 ## Release Process
 
