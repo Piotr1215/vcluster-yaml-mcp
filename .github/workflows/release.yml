@@ -45,7 +45,7 @@ jobs:
 
       - name: Update package.json version
         if: matrix.target == 'npm'
-        run: npm version ${{ inputs.version }} --no-git-tag-version
+        run: npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Build npm package
         if: matrix.target == 'npm'
