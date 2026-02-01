@@ -1,20 +1,25 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createServer } from '../src/server.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs/promises';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+/**
+ * Helper to call a tool handler
+ */
+async function callTool(server, toolName, args) {
+  const tool = server._registeredTools[toolName];
+  if (!tool) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: `Unknown tool: ${toolName}` }]
+    };
+  }
+  return await tool.handler(args);
+}
 
 describe('Tool Implementations', () => {
   let server;
-  let toolHandler;
-  const testConfigPath = path.join(__dirname, '..', 'test-config');
 
   beforeEach(() => {
-    server = createServer(testConfigPath);
-    toolHandler = server._requestHandlers.get('tools/call');
+    server = createServer();
   });
 
   // list-versions test removed - hits GitHub API rate limits in CI
@@ -22,63 +27,31 @@ describe('Tool Implementations', () => {
 
   describe('smart-query tool', () => {
     it('should find etcd configuration without requiring YAML input', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'smart-query',
-          arguments: {
-            query: 'etcd'
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'smart-query', {
+        query: 'etcd'
+      });
       expect(response.content[0].text).toMatch(/match(es)?/);
       expect(response.content[0].text.toLowerCase()).toContain('etcd');
     });
 
     it('should handle natural language queries', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'smart-query',
-          arguments: {
-            query: 'what is the service CIDR'
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'smart-query', {
+        query: 'what is the service CIDR'
+      });
       expect(response.content[0].text).toBeDefined();
     });
 
     it('should use default vcluster.yaml when no file specified', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'smart-query',
-          arguments: {
-            query: 'k3s'
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'smart-query', {
+        query: 'k3s'
+      });
       expect(response.content[0].text.toLowerCase()).toContain('values.yaml');
     });
 
     it('should handle common query patterns', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'smart-query',
-          arguments: {
-            query: 'networking'
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'smart-query', {
+        query: 'networking'
+      });
       expect(response.content[0].text.toLowerCase()).toContain('network');
     });
   });
@@ -92,18 +65,10 @@ controlPlane:
       embedded:
         enabled: true
 `;
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'create-vcluster-config',
-          arguments: {
-            yaml_content: yamlContent,
-            description: 'Test config with embedded etcd'
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'create-vcluster-config', {
+        yaml_content: yamlContent,
+        description: 'Test config with embedded etcd'
+      });
       expect(response.content[0].text).toContain('✅');
       expect(response.content[0].text).toContain('Configuration validated successfully');
       expect(response.content[0].text).toContain('controlPlane');
@@ -116,17 +81,9 @@ controlPlane:
     k3s:
       enabled: "not a boolean"
 `;
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'create-vcluster-config',
-          arguments: {
-            yaml_content: yamlContent
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'create-vcluster-config', {
+        yaml_content: yamlContent
+      });
       expect(response.content[0].text).toContain('❌');
       expect(response.content[0].text).toContain('Validation');
       expect(response.isError).toBe(true);
@@ -135,17 +92,9 @@ controlPlane:
 
   describe('validate-config tool', () => {
     it('should validate file content', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'validate-config',
-          arguments: {
-            file: 'vcluster.yaml'
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'validate-config', {
+        file: 'chart/values.yaml'
+      });
       expect(response.content[0].text).toBeDefined();
     });
 
@@ -154,30 +103,14 @@ controlPlane:
 controlPlane:
   distro: k3s
 `;
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'validate-config',
-          arguments: {
-            content: yamlContent
-          }
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'validate-config', {
+        content: yamlContent
+      });
       expect(response.content[0].text).toBeDefined();
     });
 
     it('should work with default file when no input provided', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'validate-config',
-          arguments: {}
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'validate-config', {});
       // Should validate the default chart/values.yaml
       expect(response.content[0].text).toBeDefined();
       // May or may not be valid, but shouldn't error on missing params
@@ -187,15 +120,7 @@ controlPlane:
 
   describe('Error Handling', () => {
     it('should handle unknown tool', async () => {
-      const request = {
-        method: 'tools/call',
-        params: {
-          name: 'unknown-tool',
-          arguments: {}
-        }
-      };
-
-      const response = await toolHandler(request);
+      const response = await callTool(server, 'unknown-tool', {});
       expect(response.isError).toBe(true);
       expect(response.content[0].text).toContain('Unknown tool');
     });

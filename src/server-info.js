@@ -70,3 +70,17 @@ export function getMcpServerInfo() {
     version: packageJson.version
   };
 }
+
+/**
+ * Get server options including instructions for MCP clients
+ * @returns {Object} MCP server options
+ */
+export function getMcpServerOptions() {
+  return {
+    capabilities: {
+      tools: {},
+      resources: {}
+    },
+    instructions: "vCluster configuration assistant. Use smart-query for any configuration questions (natural language search). Use create-vcluster-config when generating configs - it auto-validates. Use list-versions first to discover available versions. Use validate-config for user-provided YAML. Use extract-validation-rules to understand semantic constraints."
+  };
+}

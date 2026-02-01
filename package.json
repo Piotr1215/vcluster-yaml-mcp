@@ -1,6 +1,6 @@
 {
   "name": "vcluster-yaml-mcp-server",
-  "version": "1.0.5",
+  "version": "1.2.0",
   "description": "MCP server for querying vcluster YAML configurations using jq",
   "main": "src/index.js",
   "type": "module",
@@ -24,7 +24,7 @@
     "test:ci": "vitest run tests/ci/",
     "test:all": "vitest run",
     "test:watch": "vitest --exclude tests/integration/**/*.test.js",
-    "test:coverage": "vitest run --coverage --exclude tests/integration/**/*.test.js",
+    "test:coverage": "vitest run --coverage --exclude tests/integration/**/*.test.js --exclude tests/ci/**/*.test.js --exclude tests/performance.test.js",
     "test:mutation": "stryker run",
     "complexity": "eslint --config eslint.config.complexity.js src/**/*.js",
     "complexity:json": "eslint --config eslint.config.complexity.js --format json --output-file reports/complexity.json src/**/*.js || true",
