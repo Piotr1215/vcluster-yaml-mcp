@@ -2,6 +2,10 @@
   "name": "vcluster-yaml-mcp-server",
   "version": "1.2.0",
   "description": "MCP server for querying vcluster YAML configurations using jq",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Piotr1215/vcluster-yaml-mcp"
+  },
   "main": "src/index.js",
   "type": "module",
   "bin": {
