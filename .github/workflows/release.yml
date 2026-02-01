@@ -17,6 +17,9 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
 
     strategy:
       fail-fast: false
@@ -61,9 +64,7 @@ jobs:
 
       - name: Publish to npm
         if: matrix.target == 'npm' && inputs.dry_run == false
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
 
       - name: Set up Docker Buildx
         if: matrix.target == 'docker'
