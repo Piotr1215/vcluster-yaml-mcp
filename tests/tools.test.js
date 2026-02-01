@@ -130,7 +130,7 @@ controlPlane:
   });
 
   describe('get-changelog tool', () => {
-    it('should return changelog content', async () => {
+    it('should fetch changelog from GitHub', async () => {
       const response = await callTool(server, 'get-changelog', {});
       const changelog = JSON.parse(response.content[0].text);
       expect(changelog.version).toBeDefined();

@@ -127,21 +127,27 @@ export function getMcpServerOptions() {
   };
 }
 
+const CHANGELOG_URL = 'https://raw.githubusercontent.com/Piotr1215/vcluster-yaml-mcp/main/CHANGELOG.md';
+
 /**
- * Get changelog from CHANGELOG.md file
- * @returns {Object} Changelog with version and content
+ * Fetch changelog from GitHub
+ * @returns {Promise<Object>} Changelog with version and content
  */
-export function getChangelog() {
+export async function getChangelog() {
   try {
-    const content = readFileSync(join(__dirname, '../CHANGELOG.md'), 'utf-8');
+    const response = await fetch(CHANGELOG_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const content = await response.text();
     return {
       version: packageJson.version,
       content
     };
-  } catch {
+  } catch (error) {
     return {
       version: packageJson.version,
-      content: 'Changelog unavailable'
+      content: `Changelog unavailable: ${error.message}`
     };
   }
 }

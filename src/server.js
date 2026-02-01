@@ -134,7 +134,7 @@ export function createServer() {
       annotations: { readOnlyHint: true }
     },
     async () => ({
-      content: [{ type: 'text', text: JSON.stringify(getChangelog(), null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(await getChangelog(), null, 2) }]
     })
   );
 
@@ -170,7 +170,7 @@ export function createServer() {
         {
           uri: uri.href,
           mimeType: 'application/json',
-          text: JSON.stringify(getChangelog(), null, 2)
+          text: JSON.stringify(await getChangelog(), null, 2)
         }
       ]
     })
