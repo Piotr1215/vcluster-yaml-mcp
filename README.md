@@ -204,6 +204,19 @@ extract-validation-rules --section="controlPlane" --version="v0.24.0"
 // Extracts constraints like "Valid values: a, b, c"
 ```
 
+### Resources
+
+**server://info** - Server metadata including version and available tools
+```javascript
+// Returns: name, version, description, availableTools, build info, runtime
+```
+
+**server://changelog** - Release history
+```javascript
+// Returns: version, content (from CHANGELOG.md)
+// AI assistants check this on first use to mention relevant recent changes
+```
+
 ## Usage Examples
 
 ### Interactive Config Creation (Primary Workflow)
