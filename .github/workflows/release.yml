@@ -21,6 +21,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify version in CHANGELOG
+        run: |
+          if ! grep -q "## \[${{ inputs.version }}\]" CHANGELOG.md; then
+            echo "::error::Version ${{ inputs.version }} not found in CHANGELOG.md"
+            echo "Add changelog entry before releasing:"
+            echo "## [${{ inputs.version }}] - $(date +%Y-%m-%d)"
+            exit 1
+          fi
+          echo "✓ Version ${{ inputs.version }} found in CHANGELOG.md"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

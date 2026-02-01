@@ -28,8 +28,9 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --only=production
 
-# Copy source code
+# Copy source code and changelog
 COPY src/ ./src/
+COPY CHANGELOG.md ./
 
 # Expose port
 EXPOSE 3000
