@@ -61,6 +61,39 @@ export function getHealthInfo() {
 }
 
 /**
+ * Check if MCP server can be created and has tools registered
+ * @param {Function} createServerFn - Function that creates MCP server
+ * @returns {Promise<Object>} Readiness check result
+ */
+export async function checkReadiness(createServerFn) {
+  const start = Date.now();
+  try {
+    const server = createServerFn();
+    // _registeredTools is a plain object (not Map) in MCP SDK
+    const tools = server._registeredTools;
+    const toolCount = tools ? Object.keys(tools).length : 0;
+    if (toolCount === 0) {
+      return {
+        ready: false,
+        reason: 'no tools registered',
+        latencyMs: Date.now() - start
+      };
+    }
+    return {
+      ready: true,
+      toolCount,
+      latencyMs: Date.now() - start
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      reason: error.message,
+      latencyMs: Date.now() - start
+    };
+  }
+}
+
+/**
  * Get basic server metadata for MCP Server constructor
  * @returns {Object} MCP server metadata
  */

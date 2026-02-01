@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getServerInfo, getHealthInfo, getMcpServerInfo } from '../src/server-info.js';
+import { getServerInfo, getHealthInfo, getMcpServerInfo, checkReadiness } from '../src/server-info.js';
 
 describe('server-info', () => {
   const originalEnv = { ...process.env };
@@ -167,6 +167,60 @@ describe('server-info', () => {
 
       // ASSERT: Verify license value
       expect(info.license).toBe('MIT');
+    });
+  });
+
+  describe('checkReadiness', () => {
+    it('should return ready=true when server has tools registered', async () => {
+      // ARRANGE: Mock createServer that returns server with tools (plain object, not Map)
+      const mockServer = { _registeredTools: { 'tool1': {}, 'tool2': {} } };
+      const createServerFn = () => mockServer;
+
+      // ACT
+      const result = await checkReadiness(createServerFn);
+
+      // ASSERT
+      expect(result.ready).toBe(true);
+      expect(result.toolCount).toBe(2);
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should return ready=false when server has no tools', async () => {
+      // ARRANGE: Mock createServer with empty tools
+      const mockServer = { _registeredTools: {} };
+      const createServerFn = () => mockServer;
+
+      // ACT
+      const result = await checkReadiness(createServerFn);
+
+      // ASSERT
+      expect(result.ready).toBe(false);
+      expect(result.reason).toBe('no tools registered');
+    });
+
+    it('should return ready=false when createServer throws', async () => {
+      // ARRANGE: Mock createServer that throws
+      const createServerFn = () => { throw new Error('initialization failed'); };
+
+      // ACT
+      const result = await checkReadiness(createServerFn);
+
+      // ASSERT
+      expect(result.ready).toBe(false);
+      expect(result.reason).toBe('initialization failed');
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should work with real createServer function', async () => {
+      // ARRANGE: Import real createServer
+      const { createServer } = await import('../src/server.js');
+
+      // ACT
+      const result = await checkReadiness(createServer);
+
+      // ASSERT: Real server should have tools
+      expect(result.ready).toBe(true);
+      expect(result.toolCount).toBeGreaterThan(0);
     });
   });
 

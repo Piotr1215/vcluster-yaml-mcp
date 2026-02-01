@@ -6,7 +6,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireApiKey } from './middleware/auth.js';
 import promClient from 'prom-client';
-import { getHealthInfo, getServerInfo } from './server-info.js';
+import { getHealthInfo, getServerInfo, checkReadiness } from './server-info.js';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 
 const PORT = process.env.PORT || 3000;
@@ -71,9 +71,19 @@ const mcpLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// Health check endpoint
+// Liveness probe - shallow check
 app.get('/health', apiLimiter, (_req, res) => {
   res.json(getHealthInfo());
+});
+
+// Readiness probe - validates MCP handler can process requests
+app.get('/ready', apiLimiter, async (_req, res) => {
+  const result = await checkReadiness(createServer);
+  if (result.ready) {
+    res.json({ status: 'ready', ...result });
+  } else {
+    res.status(503).json({ status: 'not ready', ...result });
+  }
 });
 
 // Prometheus metrics endpoint
@@ -89,6 +99,7 @@ app.get('/', (_req, res) => {
     endpoints: {
       mcp: '/mcp',
       health: '/health',
+      ready: '/ready',
       metrics: '/metrics'
     }
   });
