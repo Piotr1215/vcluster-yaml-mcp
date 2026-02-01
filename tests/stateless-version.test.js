@@ -4,16 +4,18 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { createServer } from '../src/server.js';
 
 /**
  * Helper to get tool list from McpServer
+ * Converts Zod schemas to JSON schema for assertion compatibility
  */
 function getTools(server) {
   return Object.entries(server._registeredTools).map(([name, tool]) => ({
     name,
     description: tool.description,
-    inputSchema: tool.inputSchema
+    inputSchema: tool.inputSchema?._def ? zodToJsonSchema(tool.inputSchema) : tool.inputSchema
   }));
 }
 
