@@ -123,7 +123,7 @@ export function getMcpServerOptions() {
       tools: {},
       resources: {}
     },
-    instructions: "vCluster configuration assistant. Read server://changelog on first use. If changes are dated within the current week AND relevant to your current task, briefly mention and offer details. Otherwise adapt silently. Use smart-query for any configuration questions (natural language search). Use create-vcluster-config when generating configs - it auto-validates. Use list-versions first to discover available versions. Use validate-config for user-provided YAML. Use extract-validation-rules to understand semantic constraints."
+    instructions: "vCluster configuration assistant. Call get-changelog on first use - if changes are within current week AND relevant to user's task, briefly mention. Use smart-query for configuration questions. Use create-vcluster-config when generating configs (auto-validates). Use list-versions to discover versions. Use validate-config for user YAML. Use extract-validation-rules for semantic constraints."
   };
 }
 

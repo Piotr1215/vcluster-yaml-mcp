@@ -118,6 +118,26 @@ controlPlane:
     });
   });
 
+  describe('get-server-info tool', () => {
+    it('should return server metadata', async () => {
+      const response = await callTool(server, 'get-server-info', {});
+      const info = JSON.parse(response.content[0].text);
+      expect(info.name).toBe('vcluster-yaml-mcp-server');
+      expect(info.version).toBeDefined();
+      expect(info.availableTools).toBeDefined();
+      expect(Array.isArray(info.availableTools)).toBe(true);
+    });
+  });
+
+  describe('get-changelog tool', () => {
+    it('should return changelog content', async () => {
+      const response = await callTool(server, 'get-changelog', {});
+      const changelog = JSON.parse(response.content[0].text);
+      expect(changelog.version).toBeDefined();
+      expect(changelog.content).toContain('# Changelog');
+    });
+  });
+
   describe('Error Handling', () => {
     it('should handle unknown tool', async () => {
       const response = await callTool(server, 'unknown-tool', {});

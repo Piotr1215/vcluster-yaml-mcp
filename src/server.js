@@ -112,6 +112,32 @@ export function createServer() {
     }
   );
 
+  // Register: get-server-info (tool wrapper for clients that don't support resources)
+  server.registerTool(
+    'get-server-info',
+    {
+      description: 'Get server version, available tools, and metadata. Call on first use to check for updates.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true }
+    },
+    async () => ({
+      content: [{ type: 'text', text: JSON.stringify(getServerInfo(), null, 2) }]
+    })
+  );
+
+  // Register: get-changelog
+  server.registerTool(
+    'get-changelog',
+    {
+      description: 'Get recent release history. Check for changes relevant to your task.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true }
+    },
+    async () => ({
+      content: [{ type: 'text', text: JSON.stringify(getChangelog(), null, 2) }]
+    })
+  );
+
   // Register resource: server://info
   server.registerResource(
     'server-info',

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.1] - 2026-02-01
+
+### Added
+- `get-server-info` tool (workaround for clients without resource support)
+- `get-changelog` tool (workaround for clients without resource support)
+
+### Fixed
+- MCP instructions now reference tools instead of resources
+
 ## [1.3.0] - 2026-02-01
 
 ### Added
