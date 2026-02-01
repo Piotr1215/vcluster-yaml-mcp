@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getServerInfo, getHealthInfo, getMcpServerInfo, checkReadiness } from '../src/server-info.js';
+import { describe, it, expect, afterEach } from 'vitest';
+import { getServerInfo, getHealthInfo, getMcpServerInfo, checkReadiness, getChangelog } from '../src/server-info.js';
 
 describe('server-info', () => {
   const originalEnv = { ...process.env };
@@ -246,6 +246,72 @@ describe('server-info', () => {
       expect(mcpInfo.name).toBe(healthInfo.name);
       expect(healthInfo.name).toBe(serverInfo.name);
       expect(serverInfo.name).toBe('vcluster-yaml-mcp-server');
+    });
+  });
+
+  describe('getChangelog', () => {
+    it('should return changelog with version and content', () => {
+      // ACT
+      const changelog = getChangelog();
+
+      // ASSERT
+      expect(changelog).toHaveProperty('version');
+      expect(changelog).toHaveProperty('content');
+      expect(typeof changelog.version).toBe('string');
+      expect(typeof changelog.content).toBe('string');
+    });
+
+    it('should return content from CHANGELOG.md', () => {
+      // ACT
+      const changelog = getChangelog();
+
+      // ASSERT
+      expect(changelog.content).toContain('# Changelog');
+    });
+
+    it('should return version matching package.json', () => {
+      // ACT
+      const changelog = getChangelog();
+      const serverInfo = getServerInfo();
+
+      // ASSERT
+      expect(changelog.version).toBe(serverInfo.version);
+    });
+  });
+
+  describe('getServerInfo with availableTools', () => {
+    it('should include availableTools in server info', () => {
+      // ACT
+      const info = getServerInfo();
+
+      // ASSERT
+      expect(info).toHaveProperty('availableTools');
+      expect(Array.isArray(info.availableTools)).toBe(true);
+      expect(info.availableTools.length).toBeGreaterThan(0);
+    });
+
+    it('should have tools with name and description', () => {
+      // ACT
+      const info = getServerInfo();
+
+      // ASSERT
+      info.availableTools.forEach(tool => {
+        expect(tool).toHaveProperty('name');
+        expect(tool).toHaveProperty('description');
+        expect(typeof tool.name).toBe('string');
+        expect(typeof tool.description).toBe('string');
+      });
+    });
+
+    it('should include core tools', () => {
+      // ACT
+      const info = getServerInfo();
+      const toolNames = info.availableTools.map(t => t.name);
+
+      // ASSERT
+      expect(toolNames).toContain('smart-query');
+      expect(toolNames).toContain('list-versions');
+      expect(toolNames).toContain('validate-config');
     });
   });
 });

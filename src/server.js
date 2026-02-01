@@ -8,7 +8,7 @@ import {
   handleExtractRules,
   handleValidateConfig
 } from './tool-handlers.js';
-import { getMcpServerInfo, getMcpServerOptions, getServerInfo } from './server-info.js';
+import { getMcpServerInfo, getMcpServerOptions, getServerInfo, getChangelog } from './server-info.js';
 
 export function createServer() {
   const serverInfo = getMcpServerInfo();
@@ -126,6 +126,25 @@ export function createServer() {
           uri: uri.href,
           mimeType: 'application/json',
           text: JSON.stringify(getServerInfo(), null, 2)
+        }
+      ]
+    })
+  );
+
+  // Register resource: server://changelog
+  server.registerResource(
+    'server-changelog',
+    'server://changelog',
+    {
+      description: 'Recent release history with dates and changes',
+      mimeType: 'application/json'
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(getChangelog(), null, 2)
         }
       ]
     })

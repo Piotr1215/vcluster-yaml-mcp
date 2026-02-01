@@ -1,13 +1,21 @@
-import { readFile } from 'fs/promises';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Load package.json once at module level
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJson = JSON.parse(
-  await readFile(join(__dirname, '../package.json'), 'utf-8')
+  readFileSync(join(__dirname, '../package.json'), 'utf-8')
 );
+
+// Available tools (static list for changelog)
+const availableTools = [
+  { name: 'list-versions', description: 'Discover available vCluster versions (tags and branches)' },
+  { name: 'smart-query', description: 'Natural language search for vCluster configuration' },
+  { name: 'create-vcluster-config', description: 'Generate and validate vCluster YAML configs' },
+  { name: 'validate-config', description: 'Validate existing vCluster YAML against schema' },
+  { name: 'extract-validation-rules', description: 'Extract semantic validation rules from values.yaml' }
+];
 
 // Build metadata from environment (injected by Docker/CI)
 const buildInfo = {
@@ -38,7 +46,8 @@ export function getServerInfo() {
       nodeVersion: process.version,
       platform: process.platform,
       arch: process.arch
-    }
+    },
+    availableTools
   };
 }
 
@@ -114,6 +123,25 @@ export function getMcpServerOptions() {
       tools: {},
       resources: {}
     },
-    instructions: "vCluster configuration assistant. Use smart-query for any configuration questions (natural language search). Use create-vcluster-config when generating configs - it auto-validates. Use list-versions first to discover available versions. Use validate-config for user-provided YAML. Use extract-validation-rules to understand semantic constraints."
+    instructions: "vCluster configuration assistant. Read server://changelog on first use. If changes are dated within the current week AND relevant to your current task, briefly mention and offer details. Otherwise adapt silently. Use smart-query for any configuration questions (natural language search). Use create-vcluster-config when generating configs - it auto-validates. Use list-versions first to discover available versions. Use validate-config for user-provided YAML. Use extract-validation-rules to understand semantic constraints."
   };
+}
+
+/**
+ * Get changelog from CHANGELOG.md file
+ * @returns {Object} Changelog with version and content
+ */
+export function getChangelog() {
+  try {
+    const content = readFileSync(join(__dirname, '../CHANGELOG.md'), 'utf-8');
+    return {
+      version: packageJson.version,
+      content
+    };
+  } catch {
+    return {
+      version: packageJson.version,
+      content: 'Changelog unavailable'
+    };
+  }
 }
