@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.2] - 2026-02-01
+
+### Fixed
+- `get-changelog` fetches from GitHub instead of local file
+- CI: verify version exists in CHANGELOG before release
+
 ## [1.3.1] - 2026-02-01
 
 ### Added
