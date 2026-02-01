@@ -250,9 +250,9 @@ describe('server-info', () => {
   });
 
   describe('getChangelog', () => {
-    it('should return changelog with version and content', () => {
+    it('should return changelog with version and content', async () => {
       // ACT
-      const changelog = getChangelog();
+      const changelog = await getChangelog();
 
       // ASSERT
       expect(changelog).toHaveProperty('version');
@@ -261,17 +261,17 @@ describe('server-info', () => {
       expect(typeof changelog.content).toBe('string');
     });
 
-    it('should return content from CHANGELOG.md', () => {
+    it('should return content from CHANGELOG.md', async () => {
       // ACT
-      const changelog = getChangelog();
+      const changelog = await getChangelog();
 
       // ASSERT
       expect(changelog.content).toContain('# Changelog');
     });
 
-    it('should return version matching package.json', () => {
+    it('should return version matching package.json', async () => {
       // ACT
-      const changelog = getChangelog();
+      const changelog = await getChangelog();
       const serverInfo = getServerInfo();
 
       // ASSERT
