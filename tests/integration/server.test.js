@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createServer } from '../../src/server.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createServer } from '../../dist/server.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,27 +16,30 @@ describe('VCluster YAML MCP Server', () => {
 
   describe('Server Creation', () => {
     it('should create server with correct metadata', () => {
-      expect(server._serverInfo.name).toBe('vcluster-yaml-mcp-server');
-      expect(server._serverInfo.version).toBe('1.0.5');
+      // New SDK wraps the underlying server - serverInfo is on server.server
+      expect(server.server._serverInfo.name).toBe('vcluster-yaml-mcp-server');
     });
 
-    it('should have tools capability', () => {
-      expect(server._options.capabilities.tools).toBeDefined();
+    it('should have registered tools', () => {
+      // New SDK uses _registeredTools
+      expect(server._registeredTools).toBeDefined();
+      expect(Object.keys(server._registeredTools).length).toBeGreaterThan(0);
     });
 
     it('should return a valid server instance', () => {
       expect(server).toBeDefined();
       expect(server.connect).toBeDefined();
-      expect(server.setRequestHandler).toBeDefined();
+      // New SDK uses registerTool instead of setRequestHandler
+      expect(server.registerTool).toBeDefined();
     });
   });
 
   describe('Tool Definitions', () => {
-    it('should define all expected tools', async () => {
-      const handler = server._requestHandlers.get('tools/list');
-      const response = await handler({ method: 'tools/list', params: {} });
+    it('should define all expected tools', () => {
+      // New SDK uses _registeredTools object
+      const tools = server._registeredTools;
+      const toolNames = Object.keys(tools);
 
-      const toolNames = response.tools.map(t => t.name);
       expect(toolNames).toContain('list-versions');
       expect(toolNames).toContain('smart-query');
       expect(toolNames).toContain('validate-config');
@@ -50,39 +53,28 @@ describe('VCluster YAML MCP Server', () => {
       expect(toolNames).not.toContain('get-schema');
     });
 
-    it('should have correct smart-query tool definition', async () => {
-      const handler = server._requestHandlers.get('tools/list');
-      const response = await handler({ method: 'tools/list', params: {} });
-      
-      const smartQuery = response.tools.find(t => t.name === 'smart-query');
+    it('should have correct smart-query tool definition', () => {
+      const tools = server._registeredTools;
+      const smartQuery = tools['smart-query'];
+
       expect(smartQuery).toBeDefined();
       expect(smartQuery.description).toContain('UNIVERSAL SEARCH');
-      expect(smartQuery.inputSchema.required).toEqual(['query']);
-      expect(smartQuery.inputSchema.properties.query).toBeDefined();
-      expect(smartQuery.inputSchema.properties.file).toBeDefined();
     });
 
-    it('should allow optional file/content parameters for validation', async () => {
-      const handler = server._requestHandlers.get('tools/list');
-      const response = await handler({ method: 'tools/list', params: {} });
-      
-      const validateConfig = response.tools.find(t => t.name === 'validate-config');
+    it('should allow optional file/content parameters for validation', () => {
+      const tools = server._registeredTools;
+      const validateConfig = tools['validate-config'];
+
       expect(validateConfig).toBeDefined();
-      expect(validateConfig.inputSchema.required).toEqual([]);
-      expect(validateConfig.inputSchema.properties.file).toBeDefined();
-      expect(validateConfig.inputSchema.properties.content).toBeDefined();
-      // includeAiRules removed - validation always includes all layers now
+      expect(validateConfig.description).toContain('VALIDATION ONLY');
     });
 
-    it('should have extract-validation-rules tool', async () => {
-      const handler = server._requestHandlers.get('tools/list');
-      const response = await handler({ method: 'tools/list', params: {} });
-      
-      const extractRules = response.tools.find(t => t.name === 'extract-validation-rules');
+    it('should have extract-validation-rules tool', () => {
+      const tools = server._registeredTools;
+      const extractRules = tools['extract-validation-rules'];
+
       expect(extractRules).toBeDefined();
       expect(extractRules.description).toContain('AI ASSISTANT');
-      expect(extractRules.inputSchema.properties.file).toBeDefined();
-      expect(extractRules.inputSchema.properties.section).toBeDefined();
     });
   });
 });

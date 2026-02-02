@@ -3,24 +3,29 @@
  * Pure functions for parsing YAML comments and extracting validation rules
  */
 
+import type { ValidationRule, ExtractedValidationRules } from './types/index.js';
+
 /**
  * Extract validation rules from YAML comments
- * Pure function except for complex internal state management
- * Complexity: 23 → Will refactor separately
  */
-export function extractValidationRulesFromComments(yamlContent, section) {
+export function extractValidationRulesFromComments(
+  yamlContent: string,
+  section?: string
+): ExtractedValidationRules {
   const lines = yamlContent.split('\n');
-  const rules = [];
-  const enums = {};
-  const dependencies = [];
-  const defaults = {};
+  const rules: ValidationRule[] = [];
+  const enums: Record<string, string[]> = {};
+  const dependencies: string[] = [];
+  const defaults: Record<string, string> = {};
 
-  let currentPath = [];
-  let currentComments = [];
-  let indentStack = [0];
+  let currentPath: string[] = [];
+  let currentComments: string[] = [];
+  let indentStack: number[] = [0];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (!line) continue;
+
     const trimmedLine = line.trim();
 
     // Skip empty lines
@@ -44,18 +49,18 @@ export function extractValidationRulesFromComments(yamlContent, section) {
 
     if (keyMatch) {
       const key = keyMatch[2];
-      const value = keyMatch[3];
+      if (!key) continue;
 
       // Update path based on indentation
-      while (indentStack.length > 1 && indent <= indentStack[indentStack.length - 1]) {
+      while (indentStack.length > 1 && indent <= (indentStack[indentStack.length - 1] ?? 0)) {
         indentStack.pop();
         currentPath.pop();
       }
 
-      if (indent > indentStack[indentStack.length - 1]) {
+      if (indent > (indentStack[indentStack.length - 1] ?? 0)) {
         indentStack.push(indent);
-      } else if (indent < indentStack[indentStack.length - 1]) {
-        while (indentStack.length > 1 && indent < indentStack[indentStack.length - 1]) {
+      } else if (indent < (indentStack[indentStack.length - 1] ?? 0)) {
+        while (indentStack.length > 1 && indent < (indentStack[indentStack.length - 1] ?? 0)) {
           indentStack.pop();
           currentPath.pop();
         }
@@ -74,12 +79,12 @@ export function extractValidationRulesFromComments(yamlContent, section) {
 
       // Extract validation instructions from comments
       if (currentComments.length > 0) {
-        const instructions = [];
+        const instructions: string[] = [];
 
         for (const comment of currentComments) {
           // Extract enum values (e.g., "Valid values: a, b, c")
           const enumMatch = comment.match(/(?:valid values?|options?|choices?|possible values?):\s*(.+)/i);
-          if (enumMatch) {
+          if (enumMatch?.[1]) {
             const values = enumMatch[1].split(/[,;]/).map(v => v.trim()).filter(v => v);
             enums[fullPath] = values;
             instructions.push(`Valid values: ${values.join(', ')}`);
@@ -93,7 +98,7 @@ export function extractValidationRulesFromComments(yamlContent, section) {
 
           // Extract defaults
           const defaultMatch = comment.match(/default(?:s)?\s*(?:is|:)?\s*(.+)/i);
-          if (defaultMatch) {
+          if (defaultMatch?.[1]) {
             defaults[fullPath] = defaultMatch[1].trim();
           }
 
@@ -122,7 +127,7 @@ export function extractValidationRulesFromComments(yamlContent, section) {
   }
 
   // Generate AI validation instructions
-  const aiInstructions = {
+  const aiInstructions: ExtractedValidationRules = {
     summary: `Extracted ${rules.length} validation rules from YAML comments`,
     rules: rules,
     enums: enums,
@@ -138,7 +143,11 @@ export function extractValidationRulesFromComments(yamlContent, section) {
  * Generate AI validation instructions
  * Pure function - formats rules into markdown
  */
-function generateAiValidationInstructions(rules, enums, dependencies) {
+function generateAiValidationInstructions(
+  rules: ValidationRule[],
+  enums: Record<string, string[]>,
+  dependencies: string[]
+): string {
   let instructions = '### AI Validation Instructions\n\n';
   instructions += 'Please validate the configuration using these rules extracted from comments:\n\n';
 

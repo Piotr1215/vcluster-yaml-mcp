@@ -5,9 +5,8 @@
 
 /**
  * Generate bash completion script
- * @returns {string} Bash completion script
  */
-export function generateBashCompletion() {
+export function generateBashCompletion(): string {
   return `# vcluster-yaml bash completion
 
 _vcluster_yaml_completions() {
@@ -85,9 +84,8 @@ complete -F _vcluster_yaml_completions vcluster-yaml
 
 /**
  * Generate zsh completion script
- * @returns {string} Zsh completion script
  */
-export function generateZshCompletion() {
+export function generateZshCompletion(): string {
   return `#compdef vcluster-yaml
 
 # vcluster-yaml zsh completion
@@ -186,10 +184,8 @@ _vcluster_yaml "$@"
 
 /**
  * Display installation instructions for a shell
- * @param {string} shell - Shell type (bash or zsh)
- * @returns {string} Installation instructions
  */
-export function getInstallInstructions(shell) {
+export function getInstallInstructions(shell: string): string {
   if (shell === 'bash') {
     return `
 Bash Completion Installation:

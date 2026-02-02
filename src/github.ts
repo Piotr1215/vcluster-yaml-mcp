@@ -1,5 +1,5 @@
-import fetch from 'node-fetch';
 import yaml from 'js-yaml';
+import type { CacheItem, GitHubClientInterface } from './types/index.js';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com';
@@ -7,14 +7,19 @@ const REPO_OWNER = 'loft-sh';
 const REPO_NAME = 'vcluster';
 
 // Cache for fetched content (15 minute TTL)
-const cache = new Map();
+const cache = new Map<string, CacheItem<unknown>>();
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // Fetch timeout configuration
 const FETCH_TIMEOUT_MS = 30000; // 30 seconds - generous for large files
 
+interface FetchWithTimeout {
+  signal: AbortSignal;
+  cleanup: () => void;
+}
+
 // Helper to create fetch with timeout
-function createFetchWithTimeout(timeoutMs = FETCH_TIMEOUT_MS) {
+function createFetchWithTimeout(timeoutMs: number = FETCH_TIMEOUT_MS): FetchWithTimeout {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -24,15 +29,13 @@ function createFetchWithTimeout(timeoutMs = FETCH_TIMEOUT_MS) {
   };
 }
 
-class GitHubClient {
-  constructor() {
-    this.defaultBranch = 'main';
-  }
+class GitHubClient implements GitHubClientInterface {
+  private defaultBranch: string = 'main';
 
   // Get list of available tags (versions)
-  async getTags() {
+  async getTags(): Promise<string[]> {
     const cacheKey = 'tags';
-    const cached = this.getFromCache(cacheKey);
+    const cached = this.getFromCache<string[]>(cacheKey);
     if (cached) return cached;
 
     const { signal, cleanup } = createFetchWithTimeout();
@@ -50,13 +53,13 @@ class GitHubClient {
         throw new Error(`GitHub API error: ${response.statusText}`);
       }
 
-      const tags = await response.json();
+      const tags = await response.json() as Array<{ name: string }>;
       const tagNames = tags.map(tag => tag.name);
 
       this.setCache(cacheKey, tagNames);
       return tagNames;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.error('Request timeout: fetching tags took longer than 30s');
         return [];
       }
@@ -68,9 +71,9 @@ class GitHubClient {
   }
 
   // Get list of branches
-  async getBranches() {
+  async getBranches(): Promise<string[]> {
     const cacheKey = 'branches';
-    const cached = this.getFromCache(cacheKey);
+    const cached = this.getFromCache<string[]>(cacheKey);
     if (cached) return cached;
 
     const { signal, cleanup } = createFetchWithTimeout();
@@ -88,13 +91,13 @@ class GitHubClient {
         throw new Error(`GitHub API error: ${response.statusText}`);
       }
 
-      const branches = await response.json();
+      const branches = await response.json() as Array<{ name: string }>;
       const branchNames = branches.map(branch => branch.name);
 
       this.setCache(cacheKey, branchNames);
       return branchNames;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.error('Request timeout: fetching branches took longer than 30s');
         return ['main'];
       }
@@ -106,7 +109,7 @@ class GitHubClient {
   }
 
   // Get file content from GitHub
-  async getFileContent(path, ref = 'main') {
+  async getFileContent(path: string, ref: string = 'main'): Promise<string> {
     // Validate path - prevent path traversal
     if (path.includes('..') || path.startsWith('/')) {
       throw new Error('Invalid path: path traversal not allowed');
@@ -119,7 +122,7 @@ class GitHubClient {
 
     const actualRef = ref;
     const cacheKey = `file:${actualRef}:${path}`;
-    const cached = this.getFromCache(cacheKey);
+    const cached = this.getFromCache<string>(cacheKey);
     if (cached) return cached;
 
     const { signal, cleanup } = createFetchWithTimeout();
@@ -144,29 +147,29 @@ class GitHubClient {
       this.setCache(cacheKey, content);
       return content;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(`Timeout: fetching ${path} took longer than 30s`);
       }
-      throw new Error(`Failed to fetch ${path}: ${error.message}`);
+      throw new Error(`Failed to fetch ${path}: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       cleanup();
     }
   }
 
   // Get parsed YAML content
-  async getYamlContent(path, ref = null) {
-    const content = await this.getFileContent(path, ref);
+  async getYamlContent(path: string, ref: string | null = null): Promise<unknown> {
+    const content = await this.getFileContent(path, ref ?? this.defaultBranch);
     try {
       return yaml.load(content);
     } catch (error) {
-      throw new Error(`Failed to parse YAML from ${path}: ${error.message}`);
+      throw new Error(`Failed to parse YAML from ${path}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   // Get vcluster configuration files
-  async getVClusterConfigs(ref = null) {
-    const configs = {};
-    
+  async getVClusterConfigs(ref: string | null = null): Promise<Record<string, unknown>> {
+    const configs: Record<string, unknown> = {};
+
     // Known vcluster config files
     const configPaths = [
       'chart/values.yaml',
@@ -180,12 +183,12 @@ class GitHubClient {
         if (path.endsWith('.yaml') || path.endsWith('.yml')) {
           configs[path] = await this.getYamlContent(path, ref);
         } else if (path.endsWith('.json')) {
-          const content = await this.getFileContent(path, ref);
+          const content = await this.getFileContent(path, ref ?? this.defaultBranch);
           configs[path] = JSON.parse(content);
         }
       } catch (error) {
         // File might not exist in this version, skip it
-        console.debug(`Skipping ${path}: ${error.message}`);
+        console.debug(`Skipping ${path}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -193,26 +196,26 @@ class GitHubClient {
   }
 
   // Cache helpers
-  getFromCache(key) {
-    const item = cache.get(key);
+  private getFromCache<T>(key: string): T | null {
+    const item = cache.get(key) as CacheItem<T> | undefined;
     if (!item) return null;
-    
+
     if (Date.now() - item.timestamp > CACHE_TTL) {
       cache.delete(key);
       return null;
     }
-    
+
     return item.data;
   }
 
-  setCache(key, data) {
+  private setCache<T>(key: string, data: T): void {
     cache.set(key, {
       data,
       timestamp: Date.now()
     });
   }
 
-  clearCache() {
+  clearCache(): void {
     cache.clear();
   }
 }

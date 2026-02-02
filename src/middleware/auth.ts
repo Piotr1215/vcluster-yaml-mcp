@@ -1,7 +1,12 @@
 import crypto from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
+
+interface AuthenticatedRequest extends Request {
+  apiKey?: string;
+}
 
 // Timing-safe string comparison
-function secureCompare(a, b) {
+function secureCompare(a: string, b: string): boolean {
   if (!a || !b || a.length !== b.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -11,14 +16,15 @@ function secureCompare(a, b) {
 }
 
 // API key authentication middleware with timing-safe comparison
-export function requireApiKey(req, res, next) {
+export function requireApiKey(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Unauthorized',
       message: 'Missing or invalid Authorization header'
     });
+    return;
   }
 
   const token = authHeader.substring(7);
@@ -30,10 +36,11 @@ export function requireApiKey(req, res, next) {
   );
 
   if (!isValid) {
-    return res.status(403).json({
+    res.status(403).json({
       error: 'Forbidden',
       message: 'Invalid API key'
     });
+    return;
   }
 
   // Optional: Track usage per token

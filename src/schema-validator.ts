@@ -3,17 +3,102 @@
  * NO hardcoded schema structures - everything is dynamic
  */
 
+interface SchemaNode {
+  type?: string | string[];
+  properties?: Record<string, SchemaNode>;
+  additionalProperties?: SchemaNode | boolean;
+  required?: string[];
+  enum?: unknown[];
+}
+
+interface ValidationError {
+  path: string;
+  severity: string;
+  error: string;
+  suggestion?: string;
+  correct_alternatives?: string[];
+  expected_type?: string;
+  actual_type?: string;
+  fix?: string;
+  allowed_values?: unknown[];
+  actual_value?: unknown;
+}
+
+interface ContextError {
+  issue: string;
+  severity: string;
+  conflicting_paths: string[];
+  error: string;
+  fix: string;
+}
+
+interface PathValue {
+  path: string;
+  value: unknown;
+}
+
+interface ValidationPathResult {
+  valid: boolean;
+  error?: string;
+  suggestion?: string;
+  alternatives?: string[];
+  schemaNode?: SchemaNode;
+}
+
+interface TypeCheckResult {
+  valid: boolean;
+  error?: string;
+  expectedType?: string;
+  actualType?: string;
+  fix?: string;
+}
+
+interface EnumCheckResult {
+  valid: boolean;
+  error?: string;
+}
+
+interface Summary {
+  deploy_safe: boolean;
+  message: string;
+  total_errors: number;
+  severity?: string;
+}
+
+interface SchemaValidationResult {
+  syntax_valid: boolean;
+  schema_valid: boolean;
+  deploy_safe: boolean;
+  version: string;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+  context_errors: ContextError[];
+  summary: Summary;
+}
+
+interface UserConfig {
+  controlPlane?: {
+    distro?: {
+      k3s?: { enabled?: boolean };
+      k8s?: { enabled?: boolean };
+      k0s?: { enabled?: boolean };
+      eks?: { enabled?: boolean };
+    };
+  };
+  [key: string]: unknown;
+}
+
 /**
  * Validate user config against vCluster JSON schema
- * @param {Object} userConfig - User's parsed YAML configuration
- * @param {Object} schema - JSON schema from GitHub (chart/values.schema.json)
- * @param {string} version - vCluster version being validated against
- * @returns {Object} Validation result
  */
-export function validateConfigAgainstSchema(userConfig, schema, version) {
-  const errors = [];
-  const warnings = [];
-  const contextErrors = [];
+export function validateConfigAgainstSchema(
+  userConfig: UserConfig,
+  schema: SchemaNode,
+  version: string
+): SchemaValidationResult {
+  const errors: ValidationError[] = [];
+  const warnings: ValidationError[] = [];
+  const contextErrors: ContextError[] = [];
 
   // Extract all paths from user config
   const userPaths = extractAllPaths(userConfig);
@@ -26,7 +111,7 @@ export function validateConfigAgainstSchema(userConfig, schema, version) {
       errors.push({
         path,
         severity: 'error',
-        error: validation.error,
+        error: validation.error || 'Unknown error',
         suggestion: validation.suggestion,
         correct_alternatives: validation.alternatives || []
       });
@@ -39,7 +124,7 @@ export function validateConfigAgainstSchema(userConfig, schema, version) {
         errors.push({
           path,
           severity: 'error',
-          error: typeCheck.error,
+          error: typeCheck.error || 'Type error',
           expected_type: typeCheck.expectedType,
           actual_type: typeCheck.actualType,
           fix: typeCheck.fix
@@ -53,7 +138,7 @@ export function validateConfigAgainstSchema(userConfig, schema, version) {
           errors.push({
             path,
             severity: 'error',
-            error: enumCheck.error,
+            error: enumCheck.error || 'Enum error',
             allowed_values: validation.schemaNode.enum,
             actual_value: value
           });
@@ -88,11 +173,11 @@ export function validateConfigAgainstSchema(userConfig, schema, version) {
 /**
  * Extract all paths from user config with values
  */
-function extractAllPaths(obj, prefix = '') {
-  const paths = [];
+function extractAllPaths(obj: unknown, prefix: string = ''): PathValue[] {
+  const paths: PathValue[] = [];
 
   if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       const path = prefix ? `${prefix}.${key}` : key;
       paths.push({ path, value });
 
@@ -109,15 +194,15 @@ function extractAllPaths(obj, prefix = '') {
 /**
  * Validate if a path exists in schema
  */
-function validatePath(path, value, schema) {
+function validatePath(path: string, value: unknown, schema: SchemaNode): ValidationPathResult {
   const parts = path.split('.');
-  let current = schema.properties || schema;
-  let schemaNode = null;
+  let current: Record<string, SchemaNode> | undefined = schema.properties;
+  let schemaNode: SchemaNode | null = null;
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
 
-    if (!current || !current[part]) {
+    if (!current || !part || !current[part]) {
       // Path doesn't exist in schema
       return {
         valid: false,
@@ -132,8 +217,8 @@ function validatePath(path, value, schema) {
     // Navigate deeper
     if (schemaNode.properties) {
       current = schemaNode.properties;
-    } else if (schemaNode.additionalProperties) {
-      current = schemaNode.additionalProperties;
+    } else if (schemaNode.additionalProperties && typeof schemaNode.additionalProperties === 'object') {
+      current = schemaNode.additionalProperties as unknown as Record<string, SchemaNode>;
     } else if (i < parts.length - 1) {
       // Can't go deeper but we're not at the end
       if (typeof value === 'object' && value !== null) {
@@ -148,31 +233,28 @@ function validatePath(path, value, schema) {
 
   return {
     valid: true,
-    schemaNode
+    schemaNode: schemaNode || undefined
   };
 }
 
 /**
- * Find similar paths using priority-based matching (no magic numbers)
- * Priority 1: Exact match on last segment (e.g., "version" matches "apiVersion")
- * Priority 2: Substring match (e.g., "vers" matches "apiVersion")
- * Priority 3: Shared prefix (e.g., "api.vers" matches "api.version")
+ * Find similar paths using priority-based matching
  */
-function findSimilarPaths(targetPath, schema, maxSuggestions = 3) {
+function findSimilarPaths(targetPath: string, schema: SchemaNode, maxSuggestions: number = 3): string[] {
   const allPaths = extractSchemaPaths(schema);
   if (allPaths.length === 0) return [];
 
   const targetParts = targetPath.toLowerCase().split('.');
-  const targetLast = targetParts[targetParts.length - 1];
+  const targetLast = targetParts[targetParts.length - 1] || '';
 
-  // Categorize matches by clear priorities (no arbitrary scoring)
-  const exactMatches = [];
-  const substringMatches = [];
-  const prefixMatches = [];
+  // Categorize matches by clear priorities
+  const exactMatches: string[] = [];
+  const substringMatches: string[] = [];
+  const prefixMatches: Array<{ path: string; prefixLength: number }> = [];
 
   for (const schemaPath of allPaths) {
     const parts = schemaPath.toLowerCase().split('.');
-    const last = parts[parts.length - 1];
+    const last = parts[parts.length - 1] || '';
 
     // Priority 1: Exact last segment match
     if (last === targetLast) {
@@ -193,7 +275,7 @@ function findSimilarPaths(targetPath, schema, maxSuggestions = 3) {
     }
   }
 
-  // Sort prefix matches by shared prefix length (longer is better)
+  // Sort prefix matches by shared prefix length
   prefixMatches.sort((a, b) => b.prefixLength - a.prefixLength);
 
   // Combine in strict priority order
@@ -208,16 +290,14 @@ function findSimilarPaths(targetPath, schema, maxSuggestions = 3) {
 
 /**
  * Extract all paths from schema
- * Contract: schema must be an object with optional .properties field
  */
-function extractSchemaPaths(schema, prefix = '') {
+function extractSchemaPaths(schema: SchemaNode, prefix: string = ''): string[] {
   if (!schema || typeof schema !== 'object') {
     return [];
   }
 
-  const paths = [];
-  // Explicit contract: use .properties if present, otherwise treat schema as properties object
-  const props = schema.properties || schema;
+  const paths: string[] = [];
+  const props = schema.properties || {};
 
   for (const [key, value] of Object.entries(props)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -235,7 +315,7 @@ function extractSchemaPaths(schema, prefix = '') {
 /**
  * Get shared prefix length
  */
-function getSharedPrefix(arr1, arr2) {
+function getSharedPrefix(arr1: string[], arr2: string[]): number {
   let count = 0;
   const minLen = Math.min(arr1.length, arr2.length);
 
@@ -250,7 +330,7 @@ function getSharedPrefix(arr1, arr2) {
 /**
  * Validate value type
  */
-function validateType(value, schemaNode, path) {
+function validateType(value: unknown, schemaNode: SchemaNode, _path: string): TypeCheckResult {
   const expectedType = schemaNode.type;
   const actualType = getValueType(value);
 
@@ -280,7 +360,7 @@ function validateType(value, schemaNode, path) {
 /**
  * Get JavaScript type
  */
-function getValueType(value) {
+function getValueType(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
   if (typeof value === 'boolean') return 'boolean';
@@ -293,7 +373,7 @@ function getValueType(value) {
 /**
  * Validate enum constraints
  */
-function validateEnum(value, allowedValues, path) {
+function validateEnum(value: unknown, allowedValues: unknown[], _path: string): EnumCheckResult {
   if (!allowedValues.includes(value)) {
     return {
       valid: false,
@@ -307,13 +387,13 @@ function validateEnum(value, allowedValues, path) {
 /**
  * Detect conflicting configurations
  */
-function detectConflicts(userConfig) {
-  const conflicts = [];
+function detectConflicts(userConfig: UserConfig): ContextError[] {
+  const conflicts: ContextError[] = [];
 
   // Check multiple distros enabled
   if (userConfig.controlPlane?.distro) {
     const distros = userConfig.controlPlane.distro;
-    const enabled = [];
+    const enabled: string[] = [];
 
     if (distros.k3s?.enabled === true) enabled.push('k3s');
     if (distros.k8s?.enabled === true) enabled.push('k8s');
@@ -337,8 +417,8 @@ function detectConflicts(userConfig) {
 /**
  * Check required fields
  */
-function checkRequiredFields(userConfig, schema) {
-  const errors = [];
+function checkRequiredFields(userConfig: UserConfig, schema: SchemaNode): ValidationError[] {
+  const errors: ValidationError[] = [];
   const required = schema.required || [];
 
   for (const field of required) {
@@ -358,7 +438,7 @@ function checkRequiredFields(userConfig, schema) {
 /**
  * Generate summary
  */
-function generateSummary(errors, contextErrors, deploySafe) {
+function generateSummary(errors: ValidationError[], contextErrors: ContextError[], deploySafe: boolean): Summary {
   const errorCount = errors.length;
   const contextErrorCount = contextErrors.length;
   const totalIssues = errorCount + contextErrorCount;

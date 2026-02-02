@@ -14,7 +14,7 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..', '..');
-const CLI_PATH = join(projectRoot, 'src', 'cli.js');
+const CLI_PATH = join(projectRoot, 'dist', 'cli.js');
 
 /**
  * Validate that a string is valid JSON

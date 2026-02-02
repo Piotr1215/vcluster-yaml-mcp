@@ -10,7 +10,7 @@ import {
 } from './tool-handlers.js';
 import { getMcpServerInfo, getMcpServerOptions, getServerInfo, getChangelog } from './server-info.js';
 
-export function createServer() {
+export function createServer(): McpServer {
   const serverInfo = getMcpServerInfo();
   const serverOptions = getMcpServerOptions();
 

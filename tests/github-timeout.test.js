@@ -1,27 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import fetch from 'node-fetch';
-
-// Mock node-fetch
-vi.mock('node-fetch');
 
 describe('GitHub Client - Timeout Handling', () => {
   let githubClient;
+  let originalFetch;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    // Dynamic import after mocking
-    const module = await import('../src/github.js');
+    // Save original fetch
+    originalFetch = global.fetch;
+    // Dynamic import after setting up mocks - import from dist
+    const module = await import('../dist/github.js');
     githubClient = module.githubClient;
     githubClient.clearCache();
   });
 
   afterEach(() => {
+    // Restore original fetch
+    global.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
   describe('getTags timeout', () => {
     it('should handle timeout gracefully and return empty array', async () => {
-      fetch.mockImplementation(() => 
+      global.fetch = vi.fn().mockImplementation(() =>
         new Promise((_, reject) => {
           const error = new Error('Aborted');
           error.name = 'AbortError';
@@ -34,7 +35,7 @@ describe('GitHub Client - Timeout Handling', () => {
     });
 
     it('should handle network errors gracefully', async () => {
-      fetch.mockRejectedValue(new Error('Network error'));
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
       const result = await githubClient.getTags();
       expect(result).toEqual([]);
@@ -43,7 +44,7 @@ describe('GitHub Client - Timeout Handling', () => {
 
   describe('getBranches timeout', () => {
     it('should handle timeout and return default branch', async () => {
-      fetch.mockImplementation(() => 
+      global.fetch = vi.fn().mockImplementation(() =>
         new Promise((_, reject) => {
           const error = new Error('Aborted');
           error.name = 'AbortError';
@@ -58,7 +59,7 @@ describe('GitHub Client - Timeout Handling', () => {
 
   describe('getFileContent timeout', () => {
     it('should throw timeout error with helpful message', async () => {
-      fetch.mockImplementation(() => 
+      global.fetch = vi.fn().mockImplementation(() =>
         new Promise((_, reject) => {
           const error = new Error('Aborted');
           error.name = 'AbortError';
@@ -72,7 +73,7 @@ describe('GitHub Client - Timeout Handling', () => {
     });
 
     it('should handle 404 errors', async () => {
-      fetch.mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found'
@@ -84,7 +85,7 @@ describe('GitHub Client - Timeout Handling', () => {
     });
 
     it('should handle other HTTP errors', async () => {
-      fetch.mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error'
