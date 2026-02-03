@@ -397,19 +397,42 @@ export function searchYaml(allInfo: YamlInfoItem[], searchTerm: string): YamlInf
       }
     }
   } else {
-    // Keyword-based search
-    const keywords = searchTerm.split(/\s+/);
+    // Keyword-based search with stop word filtering
+    const stopWords = new Set([
+      'how', 'to', 'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+      'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+      'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought',
+      'used', 'for', 'from', 'with', 'about', 'against', 'between', 'into', 'through',
+      'during', 'before', 'after', 'above', 'below', 'up', 'down', 'in', 'out', 'on',
+      'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there',
+      'when', 'where', 'why', 'what', 'which', 'who', 'whom', 'this', 'that', 'these',
+      'those', 'am', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while',
+      'of', 'at', 'by', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
+      'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself',
+      'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',
+      'theirs', 'themselves', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+      'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't',
+      'just', 'don', 'now', 'get', 'set', 'use', 'using', 'configure', 'configuration'
+    ]);
+
+    // Filter out stop words and short words
+    const allWords = searchTerm.split(/\s+/);
+    const keywords = allWords.filter(kw => kw.length > 2 && !stopWords.has(kw));
+
+    // If all words were stop words, fall back to original (but filter very short ones)
+    const effectiveKeywords = keywords.length > 0 ? keywords : allWords.filter(w => w.length > 2);
 
     for (const item of allInfo) {
       const pathLower = item.path.toLowerCase();
       const keyLower = item.key.toLowerCase();
       const valueStr = JSON.stringify(item.value).toLowerCase();
 
-      const allKeywordsMatch = keywords.every(kw =>
+      // Match if ANY meaningful keyword matches (more lenient for natural language)
+      const anyKeywordMatch = effectiveKeywords.some(kw =>
         pathLower.includes(kw) || keyLower.includes(kw) || valueStr.includes(kw)
       );
 
-      if (allKeywordsMatch) {
+      if (anyKeywordMatch) {
         results.push(item);
       }
     }
