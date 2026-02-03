@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.2] - 2026-02-03
+
+### Added
+- Multi-keyword ranking for natural language queries
+- Paths matching more keywords surface first in results
+
 ## [1.4.1] - 2026-02-03
 
 ### Fixed
