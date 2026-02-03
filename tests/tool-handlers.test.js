@@ -242,11 +242,14 @@ describe('YAML Query Helpers', () => {
       expect(results.some(r => r.path === 'sync.enabled')).toBe(true);
     });
 
-    it('should match multiple keywords with AND logic', () => {
+    it('should match ANY keyword with OR logic (natural language support)', () => {
       const results = searchYaml(allInfo, 'controlplane enabled');
 
+      // With OR logic, matches anything containing 'controlplane' OR 'enabled'
       expect(results.some(r => r.path === 'controlPlane.enabled')).toBe(true);
-      expect(results.every(r => r.path.includes('controlPlane'))).toBe(true);
+      // Should also match sync.enabled, networking.enabled (they contain 'enabled')
+      expect(results.some(r => r.path === 'sync.enabled')).toBe(true);
+      expect(results.length).toBeGreaterThanOrEqual(3);
     });
   });
 
