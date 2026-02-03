@@ -2,7 +2,7 @@
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from './server.js';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireApiKey } from './middleware/auth.js';
 import promClient from 'prom-client';
@@ -40,7 +40,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Security headers
-app.use((req, res, next) => {
+app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.removeHeader('X-Powered-By');
@@ -72,12 +72,12 @@ const mcpLimiter = rateLimit({
 });
 
 // Liveness probe - shallow check
-app.get('/health', apiLimiter, (_req, res) => {
+app.get('/health', apiLimiter, (_req: Request, res: Response) => {
   res.json(getHealthInfo());
 });
 
 // Readiness probe - validates MCP handler can process requests
-app.get('/ready', apiLimiter, async (_req, res) => {
+app.get('/ready', apiLimiter, async (_req: Request, res: Response) => {
   const result = await checkReadiness(createServer);
   if (result.ready) {
     res.json({ status: 'ready', ...result });
@@ -87,13 +87,13 @@ app.get('/ready', apiLimiter, async (_req, res) => {
 });
 
 // Prometheus metrics endpoint
-app.get('/metrics', async (_req, res) => {
+app.get('/metrics', async (_req: Request, res: Response) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
 });
 
 // Root endpoint info
-app.get('/', (_req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     ...getServerInfo(),
     endpoints: {
@@ -105,14 +105,23 @@ app.get('/', (_req, res) => {
   });
 });
 
+interface JsonRpcRequest {
+  method?: string;
+  id?: string | number;
+  params?: {
+    name?: string;
+    uri?: string;
+  };
+}
+
 // MCP endpoint with Streamable HTTP transport
-const mcpHandler = async (req, res) => {
+const mcpHandler = async (req: Request, res: Response): Promise<void> => {
   const start = Date.now();
   const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   console.log(`MCP ${req.method} request from ${clientIp}`);
 
   // Extract JSONRPC request details for tracing
-  const jsonrpcRequest = req.body;
+  const jsonrpcRequest = req.body as JsonRpcRequest;
   const mcpMethod = jsonrpcRequest?.method || 'unknown';
   const mcpId = jsonrpcRequest?.id;
   const mcpParams = jsonrpcRequest?.params;
@@ -122,9 +131,9 @@ const mcpHandler = async (req, res) => {
       // Add MCP-specific span attributes
       span.setAttribute('mcp.method', mcpMethod);
       if (mcpId !== undefined) {
-        span.setAttribute('mcp.id', mcpId);
+        span.setAttribute('mcp.id', String(mcpId));
       }
-      span.setAttribute('http.client_ip', clientIp);
+      span.setAttribute('http.client_ip', String(clientIp));
 
       // Add tool-specific attributes for tools/call
       if (mcpMethod === 'tools/call' && mcpParams?.name) {
@@ -156,8 +165,9 @@ const mcpHandler = async (req, res) => {
       span.setStatus({ code: SpanStatusCode.OK });
     } catch (error) {
       mcpRequestCounter.inc({ method: req.method, status: 'error' });
-      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-      span.recordException(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
+      span.recordException(error instanceof Error ? error : new Error(errorMessage));
       throw error;
     } finally {
       mcpRequestDuration.observe({ method: req.method }, (Date.now() - start) / 1000);
@@ -166,9 +176,12 @@ const mcpHandler = async (req, res) => {
   });
 };
 
+// Middleware to pass through or require auth
+const authMiddleware = REQUIRE_AUTH ? requireApiKey : (_req: Request, _res: Response, next: NextFunction) => next();
+
 // Support both GET and POST for MCP endpoint
-app.get('/mcp', mcpLimiter, REQUIRE_AUTH ? requireApiKey : (req, res, next) => next(), mcpHandler);
-app.post('/mcp', mcpLimiter, REQUIRE_AUTH ? requireApiKey : (req, res, next) => next(), mcpHandler);
+app.get('/mcp', mcpLimiter, authMiddleware, mcpHandler);
+app.post('/mcp', mcpLimiter, authMiddleware, mcpHandler);
 
 app.listen(PORT, () => {
   console.log(`vcluster-yaml-mcp-server HTTP running on port ${PORT}`);

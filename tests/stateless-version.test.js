@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { createServer } from '../src/server.js';
+import { createServer } from '../dist/server.js';
 
 /**
  * Helper to get tool list from McpServer

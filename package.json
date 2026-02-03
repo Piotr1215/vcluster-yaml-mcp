@@ -6,32 +6,40 @@
     "type": "git",
     "url": "https://github.com/Piotr1215/vcluster-yaml-mcp"
   },
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "vcluster-yaml-mcp-server": "./src/index.js",
-    "vcluster-yaml": "./src/cli.js"
+    "vcluster-yaml-mcp-server": "./dist/index.js",
+    "vcluster-yaml": "./dist/cli.js"
   },
   "files": [
-    "src/**/*.js",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "README.md"
   ],
   "scripts": {
-    "start": "node src/index.js",
-    "start:http": "node src/http-server.js",
+    "prepare": "npm run build",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "start:dev": "tsx src/index.ts",
+    "start:http": "node dist/http-server.js",
+    "start:http:dev": "tsx src/http-server.ts",
     "docker:build": "docker build -t piotrzan/vcluster-yaml-mcp-server:latest .",
     "docker:push": "docker push piotrzan/vcluster-yaml-mcp-server:latest",
-    "test": "vitest run --exclude tests/integration/**/*.test.js --exclude tests/ci/**/*.test.js --exclude tests/performance.test.js",
-    "test:unit": "vitest run --exclude tests/integration/**/*.test.js --exclude tests/ci/**/*.test.js --exclude tests/performance.test.js",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude tests/integration/**/*.test.ts --exclude tests/ci/**/*.test.ts --exclude tests/performance.test.ts",
+    "test:unit": "vitest run --exclude tests/integration/**/*.test.ts --exclude tests/ci/**/*.test.ts --exclude tests/performance.test.ts",
     "test:integration": "vitest run tests/integration/",
-    "test:perf": "vitest run tests/performance.test.js",
+    "test:perf": "vitest run tests/performance.test.ts",
     "test:ci": "vitest run tests/ci/",
     "test:all": "vitest run",
-    "test:watch": "vitest --exclude tests/integration/**/*.test.js",
-    "test:coverage": "vitest run --coverage --exclude tests/integration/**/*.test.js --exclude tests/ci/**/*.test.js --exclude tests/performance.test.js",
+    "test:watch": "vitest --exclude tests/integration/**/*.test.ts",
+    "test:coverage": "vitest run --coverage --exclude tests/integration/**/*.test.ts --exclude tests/ci/**/*.test.ts --exclude tests/performance.test.ts",
     "test:mutation": "stryker run",
-    "complexity": "eslint --config eslint.config.complexity.js src/**/*.js",
-    "complexity:json": "eslint --config eslint.config.complexity.js --format json --output-file reports/complexity.json src/**/*.js || true",
+    "complexity": "eslint --config eslint.config.complexity.js src/**/*.ts",
+    "complexity:json": "eslint --config eslint.config.complexity.js --format json --output-file reports/complexity.json src/**/*.ts || true",
     "lint:workflows": "actionlint .github/workflows/*.yml"
   },
   "dependencies": {
@@ -60,6 +68,10 @@
   "devDependencies": {
     "@stryker-mutator/core": "^9.2.0",
     "@stryker-mutator/vitest-runner": "^9.2.0",
+    "@types/express": "^5.0.6",
+    "@types/express-rate-limit": "^5.1.3",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.2.0",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.38.0",
     "execa": "^9.5.2",
@@ -68,6 +80,8 @@
     "jsonschema": "^1.5.0",
     "strip-ansi": "^7.1.0",
     "supertest": "^7.1.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
 }

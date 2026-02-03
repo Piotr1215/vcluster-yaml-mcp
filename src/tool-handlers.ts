@@ -6,6 +6,16 @@
 
 import { validateSnippet } from './snippet-validator.js';
 import { extractValidationRulesFromComments } from './validation-rules.js';
+import type {
+  McpToolResponse,
+  GitHubClientInterface,
+  ValidationResult,
+  YamlInfoItem,
+  CreateConfigOptions,
+  QueryOptions,
+  ValidateConfigOptions,
+  ExtractRulesOptions
+} from './types/index.js';
 
 // ============================================================================
 // RESPONSE BUILDERS (Pure Functions)
@@ -15,7 +25,7 @@ import { extractValidationRulesFromComments } from './validation-rules.js';
  * Build success response
  * Pure function: same input → same output
  */
-export function buildSuccessResponse(text) {
+export function buildSuccessResponse(text: string): McpToolResponse {
   return {
     content: [{ type: 'text', text }],
     isError: false
@@ -26,7 +36,7 @@ export function buildSuccessResponse(text) {
  * Build error response
  * Pure function: same input → same output
  */
-export function buildErrorResponse(text) {
+export function buildErrorResponse(text: string): McpToolResponse {
   return {
     content: [{ type: 'text', text }],
     isError: true
@@ -37,11 +47,20 @@ export function buildErrorResponse(text) {
 // FORMATTING (Pure Functions)
 // ============================================================================
 
+interface FormatValidationOptions {
+  yaml_content: string;
+  description?: string;
+  version: string;
+}
+
 /**
  * Format validation result to markdown
  * Pure function - no side effects
  */
-export function formatValidationResult(result, {yaml_content, description, version}) {
+export function formatValidationResult(
+  result: ValidationResult,
+  { yaml_content, description, version }: FormatValidationOptions
+): string {
   let response = '';
 
   if (description) {
@@ -83,18 +102,28 @@ export function formatValidationResult(result, {yaml_content, description, versi
  * Format versions list
  * Pure function
  */
-export function formatVersionsList(versions) {
+export function formatVersionsList(versions: string[]): string {
   const display = versions.slice(0, 20);
   const more = versions.length > 20 ? `... and ${versions.length - 20} more\n` : '';
 
   return `Available vCluster versions:\n\n${display.map(v => `- ${v}`).join('\n')}\n${more}`;
 }
 
+interface FormatQueryOptions {
+  query: string;
+  fileName: string;
+  version: string;
+  maxResults: number;
+}
+
 /**
  * Format query results
  * Pure function
  */
-export function formatQueryResults(results, { query, fileName, version, maxResults }) {
+export function formatQueryResults(
+  results: YamlInfoItem[],
+  { query, fileName, version, maxResults }: FormatQueryOptions
+): string {
   const limitedResults = results.slice(0, maxResults);
   const hasMore = results.length > maxResults;
 
@@ -111,45 +140,66 @@ export function formatQueryResults(results, { query, fileName, version, maxResul
  * Format single match
  * Pure function
  */
-function formatMatch(item, idx, total) {
+function formatMatch(item: YamlInfoItem, idx: number, total: number): string {
   const prefix = `**[${idx + 1}/${total}]** \`${item.path}\``;
 
   if (item.isLeaf) {
     const valueStr = JSON.stringify(item.value, null, 2);
     return `${prefix}\n\`\`\`\n${valueStr}\n\`\`\`\n`;
   } else {
-    const keys = Object.keys(item.value || {});
+    const keys = Object.keys((item.value as Record<string, unknown>) ?? {});
     return `${prefix}\n  Contains: ${keys.join(', ')}\n`;
   }
+}
+
+interface FormatNoMatchesOptions {
+  query: string;
+  fileName: string;
+  version: string;
+  similarPaths: string[];
+  yamlData: Record<string, unknown> | null;
 }
 
 /**
  * Format no-match message
  * Pure function
  */
-export function formatNoMatches({ query, fileName, version, similarPaths, yamlData }) {
+export function formatNoMatches({
+  query,
+  fileName,
+  version,
+  similarPaths,
+  yamlData
+}: FormatNoMatchesOptions): string {
   return `No matches found for "${query}" in ${fileName} (${version}).\n\n` +
          (similarPaths.length > 0 ? `Similar paths:\n${similarPaths.map(p => `  - ${p}`).join('\n')}\n\n` : '') +
          `Tips:\n` +
          `  - Use dot notation: "controlPlane.ingress.enabled"\n` +
-         `  - Try broader terms: "${query.split('.')[0] || query.split(/\s+/)[0]}"\n` +
+         `  - Try broader terms: "${query.split('.')[0] ?? query.split(/\s+/)[0] ?? query}"\n` +
          `  - Use extract-validation-rules for section details\n\n` +
-         `Top-level sections:\n${Object.keys(yamlData || {}).map(k => `  - ${k}`).join('\n')}`;
+         `Top-level sections:\n${Object.keys(yamlData ?? {}).map(k => `  - ${k}`).join('\n')}`;
 }
 
 // ============================================================================
 // TOOL HANDLERS (Each is a pure async function)
 // ============================================================================
 
+interface JsonSchema {
+  [key: string]: unknown;
+}
+
 /**
  * Handle: create-vcluster-config
  * Pure function except for I/O (githubClient)
  */
-export async function handleCreateConfig(args, githubClient) {
+export async function handleCreateConfig(
+  args: CreateConfigOptions,
+  githubClient: GitHubClientInterface
+): Promise<McpToolResponse> {
   const { yaml_content, description, version = 'main' } = args;
 
   const schemaContent = await githubClient.getFileContent('chart/values.schema.json', version);
-  const fullSchema = JSON.parse(schemaContent);
+  const fullSchema = JSON.parse(schemaContent) as JsonSchema;
 
   const validationResult = validateSnippet(
     yaml_content,
@@ -174,7 +224,10 @@ export async function handleCreateConfig(args, githubClient) {
  * Handle: list-versions
  * Pure function except for I/O
  */
-export async function handleListVersions(args, githubClient) {
+export async function handleListVersions(
+  _args: Record<string, unknown>,
+  githubClient: GitHubClientInterface
+): Promise<McpToolResponse> {
   const tags = await githubClient.getTags();
   const versionTags = tags.filter(tag => tag.startsWith('v'));
   const versions = ['main', ...versionTags];
@@ -188,11 +241,14 @@ export async function handleListVersions(args, githubClient) {
  * Pure function except for I/O
  * CRITICAL: Must never fail - always return helpful results or fallback
  */
-export async function handleSmartQuery(args, githubClient) {
+export async function handleSmartQuery(
+  args: QueryOptions,
+  githubClient: GitHubClientInterface
+): Promise<McpToolResponse> {
   const { query, version = 'main', file = 'chart/values.yaml' } = args;
 
   try {
-    const yamlData = await githubClient.getYamlContent(file, version);
+    const yamlData = await githubClient.getYamlContent(file, version) as Record<string, unknown>;
     const searchTerm = query.toLowerCase();
 
     // Extract all paths (pure function)
@@ -222,9 +278,10 @@ export async function handleSmartQuery(args, githubClient) {
     return buildSuccessResponse(formatted);
   } catch (error) {
     // Graceful fallback - always provide helpful message
-    const errorMsg = error.message.includes('Timeout')
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMsg = errorMessage.includes('Timeout')
       ? `⏱️ Request timed out while fetching ${file} (version: ${version}).\n\n**Suggestions:**\n- Try a different version (e.g., "v0.29.1")\n- The file might be temporarily unavailable\n- Check if the file path is correct`
-      : `❌ Error searching for "${query}" in ${file} (version: ${version}):\n${error.message}\n\n**Suggestions:**\n- Try "list-versions" to see available versions\n- Verify the file path is correct`;
+      : `❌ Error searching for "${query}" in ${file} (version: ${version}):\n${errorMessage}\n\n**Suggestions:**\n- Try "list-versions" to see available versions\n- Verify the file path is correct`;
 
     return buildSuccessResponse(errorMsg);
   }
@@ -234,7 +291,10 @@ export async function handleSmartQuery(args, githubClient) {
  * Handle: extract-validation-rules
  * Pure function except for I/O
  */
-export async function handleExtractRules(args, githubClient) {
+export async function handleExtractRules(
+  args: ExtractRulesOptions,
+  githubClient: GitHubClientInterface
+): Promise<McpToolResponse> {
   const { version = 'main', file = 'chart/values.yaml', section } = args;
 
   try {
@@ -253,7 +313,7 @@ export async function handleExtractRules(args, githubClient) {
     // No pretty-printing to reduce size
     return buildSuccessResponse(JSON.stringify(optimizedRules));
   } catch (error) {
-    return buildErrorResponse(`Failed to extract validation rules: ${error.message}`);
+    return buildErrorResponse(`Failed to extract validation rules: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -261,11 +321,14 @@ export async function handleExtractRules(args, githubClient) {
  * Handle: validate-config
  * Pure function except for I/O
  */
-export async function handleValidateConfig(args, githubClient) {
+export async function handleValidateConfig(
+  args: ValidateConfigOptions,
+  githubClient: GitHubClientInterface
+): Promise<McpToolResponse> {
   const { version = 'main', content, file } = args;
 
   // Get YAML content
-  let yamlContent;
+  let yamlContent: string;
   if (content) {
     yamlContent = content;
   } else if (file) {
@@ -276,7 +339,7 @@ export async function handleValidateConfig(args, githubClient) {
 
   // Get schema
   const schemaContent = await githubClient.getFileContent('chart/values.schema.json', version);
-  const schema = JSON.parse(schemaContent);
+  const schema = JSON.parse(schemaContent) as JsonSchema;
 
   // Validate (pure function)
   const result = validateSnippet(yamlContent, schema, version, null);
@@ -292,11 +355,12 @@ export async function handleValidateConfig(args, githubClient) {
  * Extract all paths and values from YAML
  * Pure function
  */
-export function extractYamlInfo(obj, path = '') {
-  const info = [];
+export function extractYamlInfo(obj: unknown, path: string = ''): YamlInfoItem[] {
+  const info: YamlInfoItem[] = [];
 
   if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-    for (const [key, value] of Object.entries(obj)) {
+    const record = obj as Record<string, unknown>;
+    for (const [key, value] of Object.entries(record)) {
       const currentPath = path ? `${path}.${key}` : key;
 
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -315,8 +379,8 @@ export function extractYamlInfo(obj, path = '') {
  * Search YAML info for query
  * Pure function
  */
-export function searchYaml(allInfo, searchTerm) {
-  const results = [];
+export function searchYaml(allInfo: YamlInfoItem[], searchTerm: string): YamlInfoItem[] {
+  const results: YamlInfoItem[] = [];
   const isDotNotation = searchTerm.includes('.');
 
   if (isDotNotation) {
@@ -358,7 +422,7 @@ export function searchYaml(allInfo, searchTerm) {
  * Find similar paths
  * Pure function
  */
-export function findSimilarPaths(allInfo, searchTerm) {
+export function findSimilarPaths(allInfo: YamlInfoItem[], searchTerm: string): string[] {
   return allInfo
     .filter(item => {
       const pathParts = item.path.toLowerCase().split('.');
@@ -372,7 +436,7 @@ export function findSimilarPaths(allInfo, searchTerm) {
  * Sort results by relevance
  * Pure function
  */
-export function sortByRelevance(results, searchTerm) {
+export function sortByRelevance(results: YamlInfoItem[], searchTerm: string): YamlInfoItem[] {
   return [...results].sort((a, b) => {
     const scoreA = rankResult(a, searchTerm);
     const scoreB = rankResult(b, searchTerm);
@@ -384,7 +448,7 @@ export function sortByRelevance(results, searchTerm) {
  * Rank search result
  * Pure function
  */
-function rankResult(item, searchTerm) {
+function rankResult(item: YamlInfoItem, searchTerm: string): number {
   let score = 0;
   const pathLower = item.path.toLowerCase();
   const keyLower = item.key.toLowerCase();

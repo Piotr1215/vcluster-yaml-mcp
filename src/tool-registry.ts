@@ -12,12 +12,18 @@ import {
   handleValidateConfig,
   buildErrorResponse
 } from './tool-handlers.js';
+import type { McpToolResponse, GitHubClientInterface } from './types/index.js';
+
+// Base handler type for the registry - uses 'any' for args since each handler
+// has its own specific argument type. Type safety is enforced at the handler level.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToolHandler = (args: any, githubClient: GitHubClientInterface) => Promise<McpToolResponse>;
 
 /**
  * Tool registry - Strategy pattern instead of switch statement
  * Pure object mapping: tool name → handler function
  */
-export const toolHandlers = {
+export const toolHandlers: Record<string, ToolHandler> = {
   'create-vcluster-config': handleCreateConfig,
   'list-versions': handleListVersions,
   'smart-query': handleSmartQuery,
@@ -30,7 +36,11 @@ export const toolHandlers = {
  * Complexity: 2 (single if statement)
  * Pure function except for handler execution
  */
-export async function executeToolHandler(toolName, args, githubClient) {
+export async function executeToolHandler(
+  toolName: string,
+  args: Record<string, unknown>,
+  githubClient: GitHubClientInterface
+): Promise<McpToolResponse> {
   const handler = toolHandlers[toolName];
 
   if (!handler) {
@@ -40,6 +50,6 @@ export async function executeToolHandler(toolName, args, githubClient) {
   try {
     return await handler(args, githubClient);
   } catch (error) {
-    return buildErrorResponse(`Error executing ${toolName}: ${error.message}`);
+    return buildErrorResponse(`Error executing ${toolName}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

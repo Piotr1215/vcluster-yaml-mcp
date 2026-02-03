@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { getServerInfo, getHealthInfo, getMcpServerInfo, checkReadiness, getChangelog } from '../src/server-info.js';
+import { getServerInfo, getHealthInfo, getMcpServerInfo, checkReadiness, getChangelog } from '../dist/server-info.js';
 
 describe('server-info', () => {
   const originalEnv = { ...process.env };

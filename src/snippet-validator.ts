@@ -3,16 +3,35 @@
  * Enables deterministic validation of vCluster config snippets without requiring full documents
  */
 
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
+import type { ValidateFunction, ErrorObject } from 'ajv';
+import { default as AjvClass } from 'ajv';
+import { default as addFormatsPlugin } from 'ajv-formats';
 import yaml from 'js-yaml';
+import type { ValidationResult, ValidatorCacheStats } from './types/index.js';
+
+// AJV constructor
+const Ajv = AjvClass as unknown as typeof AjvClass.default;
+const addFormats = addFormatsPlugin as unknown as typeof addFormatsPlugin.default;
+
+interface JsonSchema {
+  type?: string;
+  properties?: Record<string, JsonSchema>;
+  $ref?: string;
+  $defs?: Record<string, JsonSchema>;
+  definitions?: Record<string, JsonSchema>;
+  additionalProperties?: boolean;
+}
 
 /**
  * Validator cache to avoid recompiling schemas
  * Maps schema section paths to compiled AJV validators
  */
 class ValidatorCache {
-  constructor(maxSize = 20) {
+  private cache: Map<string, ValidateFunction>;
+  private maxSize: number;
+  private currentVersion: string | null;
+
+  constructor(maxSize: number = 20) {
     this.cache = new Map();
     this.maxSize = maxSize;
     this.currentVersion = null;
@@ -21,7 +40,7 @@ class ValidatorCache {
   /**
    * Get cached validator or return null
    */
-  get(sectionPath, version) {
+  get(sectionPath: string, version: string): ValidateFunction | null {
     if (this.currentVersion !== version) {
       this.clear();
       this.currentVersion = version;
@@ -29,19 +48,21 @@ class ValidatorCache {
     }
 
     const key = `${version}:${sectionPath}`;
-    return this.cache.get(key) || null;
+    return this.cache.get(key) ?? null;
   }
 
   /**
    * Set validator in cache
    */
-  set(sectionPath, version, validator) {
+  set(sectionPath: string, version: string, validator: ValidateFunction): void {
     const key = `${version}:${sectionPath}`;
 
     // Evict oldest entry if cache is full
     if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+      if (firstKey) {
+        this.cache.delete(firstKey);
+      }
     }
 
     this.cache.set(key, validator);
@@ -50,14 +71,14 @@ class ValidatorCache {
   /**
    * Clear cache (e.g., on version change)
    */
-  clear() {
+  clear(): void {
     this.cache.clear();
   }
 
   /**
    * Get cache stats
    */
-  getStats() {
+  getStats(): ValidatorCacheStats {
     return {
       size: this.cache.size,
       maxSize: this.maxSize,
@@ -71,11 +92,11 @@ const validatorCache = new ValidatorCache(20);
 
 /**
  * Detect which schema section a snippet belongs to
- * @param {Object} parsedSnippet - Parsed YAML snippet
- * @param {Object} fullSchema - Full vCluster JSON schema
- * @returns {string|null} Schema section path (e.g., "controlPlane", "sync.toHost")
  */
-export function detectSchemaSection(parsedSnippet, fullSchema) {
+export function detectSchemaSection(
+  parsedSnippet: Record<string, unknown>,
+  fullSchema: JsonSchema
+): string | null {
   if (!parsedSnippet || typeof parsedSnippet !== 'object') {
     return null;
   }
@@ -86,7 +107,7 @@ export function detectSchemaSection(parsedSnippet, fullSchema) {
   }
 
   // First, check if top-level keys are valid schema sections
-  const schemaProps = fullSchema.properties || {};
+  const schemaProps = fullSchema.properties ?? {};
   const validTopLevelSections = Object.keys(schemaProps);
 
   // Find matching top-level sections
@@ -96,7 +117,7 @@ export function detectSchemaSection(parsedSnippet, fullSchema) {
 
   if (matchingSections.length > 0) {
     // If multiple sections found, return the first one (user can provide hint)
-    return matchingSections[0];
+    return matchingSections[0] ?? null;
   }
 
   // If no top-level match, check if keys might be nested properties
@@ -105,13 +126,13 @@ export function detectSchemaSection(parsedSnippet, fullSchema) {
     const sectionSchema = schemaProps[section];
     if (sectionSchema && sectionSchema.properties) {
       const hasMatch = topLevelKeys.some(key =>
-        key in sectionSchema.properties
+        key in (sectionSchema.properties ?? {})
       );
 
       if (hasMatch) {
         // Check if ALL keys are in this section
         const allMatch = topLevelKeys.every(key =>
-          key in sectionSchema.properties
+          key in (sectionSchema.properties ?? {})
         );
 
         if (allMatch) {
@@ -127,32 +148,35 @@ export function detectSchemaSection(parsedSnippet, fullSchema) {
 
 /**
  * Extract sub-schema for a specific section
- * @param {Object} fullSchema - Full vCluster JSON schema
- * @param {string} sectionPath - Dot-notation path (e.g., "controlPlane", "sync.toHost")
- * @returns {Object|null} Isolated sub-schema for that section
  */
-export function extractSubSchema(fullSchema, sectionPath) {
+export function extractSubSchema(
+  fullSchema: JsonSchema,
+  sectionPath: string
+): JsonSchema | null {
   if (!sectionPath) {
     return null;
   }
 
   const pathParts = sectionPath.split('.');
-  let current = fullSchema.properties || fullSchema;
+  let current: Record<string, JsonSchema> | JsonSchema = fullSchema.properties ?? fullSchema;
 
   // Navigate to the target schema node
   for (let i = 0; i < pathParts.length; i++) {
     const part = pathParts[i];
+    if (!part) continue;
 
-    if (!current || !current[part]) {
+    const currentAsRecord = current as Record<string, JsonSchema>;
+    if (!currentAsRecord[part]) {
       return null;
     }
 
-    current = current[part];
+    current = currentAsRecord[part];
 
     // If there are more parts to traverse, move into properties
     if (i < pathParts.length - 1) {
-      if (current.properties) {
-        current = current.properties;
+      const currentSchema = current as JsonSchema;
+      if (currentSchema.properties) {
+        current = currentSchema.properties;
       } else {
         // Can't go deeper
         return null;
@@ -161,14 +185,13 @@ export function extractSubSchema(fullSchema, sectionPath) {
   }
 
   // Return the schema node we found
-  return current;
+  return current as JsonSchema;
 }
 
 /**
  * Create AJV instance configured for vCluster validation
- * @returns {Ajv} Configured AJV instance
  */
-function createAjvInstance() {
+function createAjvInstance(): InstanceType<typeof Ajv> {
   const ajv = new Ajv({
     allErrors: true,      // Return all errors, not just first
     strict: false,        // Allow unknown keywords
@@ -182,13 +205,13 @@ function createAjvInstance() {
 
 /**
  * Validate YAML snippet against vCluster schema
- * @param {string} snippetYaml - YAML snippet string
- * @param {Object} fullSchema - Full vCluster JSON schema
- * @param {string} version - vCluster version
- * @param {string|null} sectionHint - Optional hint for schema section
- * @returns {Object} Validation result with errors
  */
-export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = null) {
+export function validateSnippet(
+  snippetYaml: string,
+  fullSchema: JsonSchema,
+  version: string,
+  sectionHint: string | null = null
+): ValidationResult {
   const startTime = Date.now();
   const MAX_YAML_SIZE = 1024 * 1024; // 1MB
 
@@ -204,14 +227,14 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
   }
 
   // Parse YAML
-  let parsedSnippet;
+  let parsedSnippet: Record<string, unknown>;
   try {
-    parsedSnippet = yaml.load(snippetYaml);
+    parsedSnippet = yaml.load(snippetYaml) as Record<string, unknown>;
   } catch (yamlError) {
     return {
       valid: false,
       syntax_valid: false,
-      syntax_error: yamlError.message,
+      syntax_error: yamlError instanceof Error ? yamlError.message : String(yamlError),
       elapsed_ms: Date.now() - startTime
     };
   }
@@ -226,7 +249,7 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
 
   // Detect if this is a full document or a snippet
   const topLevelKeys = Object.keys(parsedSnippet);
-  const schemaProps = fullSchema.properties || {};
+  const schemaProps = fullSchema.properties ?? {};
   const validTopLevelSections = Object.keys(schemaProps);
 
   // Find all matching top-level sections
@@ -236,11 +259,10 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
 
   // Determine if this is a full document or single section snippet
   const isFullDocument = matchingSections.length > 1;
-  const isSingleSectionAtRoot = matchingSections.length === 1;
 
   let section = sectionHint;
-  let validationSchema;
-  let cacheKey;
+  let validationSchema: JsonSchema;
+  let cacheKey: string;
 
   if (isFullDocument) {
     // Multiple top-level sections = validate as full document
@@ -248,15 +270,17 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
     cacheKey = `__full__:${version}`;
 
     // Build schema with only the sections present in the snippet
-    const snippetSchema = {
+    const snippetSchema: JsonSchema = {
       type: 'object',
       properties: {},
       additionalProperties: false,
-      $defs: fullSchema.$defs || fullSchema.definitions
+      $defs: fullSchema.$defs ?? fullSchema.definitions
     };
 
     for (const key of matchingSections) {
-      snippetSchema.properties[key] = schemaProps[key];
+      if (snippetSchema.properties && schemaProps[key]) {
+        snippetSchema.properties[key] = schemaProps[key];
+      }
     }
 
     validationSchema = snippetSchema;
@@ -301,14 +325,14 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
           [section]: subSchema
         },
         additionalProperties: false,
-        $defs: fullSchema.$defs || fullSchema.definitions
+        $defs: fullSchema.$defs ?? fullSchema.definitions
       };
     } else {
       // Snippet is the content of the section
       if (subSchema.$ref) {
         validationSchema = {
           ...subSchema,
-          $defs: fullSchema.$defs || fullSchema.definitions
+          $defs: fullSchema.$defs ?? fullSchema.definitions
         };
       } else {
         validationSchema = subSchema;
@@ -316,10 +340,13 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
     }
   }
 
-  // Check cache
-  let validate = validatorCache.get(cacheKey, version);
+  // Check cache or compile schema
+  const cachedValidator = validatorCache.get(cacheKey, version);
+  let validate: ValidateFunction;
 
-  if (!validate) {
+  if (cachedValidator) {
+    validate = cachedValidator;
+  } else {
     // Compile schema
     const ajv = createAjvInstance();
     try {
@@ -329,16 +356,16 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
       return {
         valid: false,
         error: 'Schema compilation error',
-        details: compileError.message,
+        details: compileError instanceof Error ? compileError.message : String(compileError),
         elapsed_ms: Date.now() - startTime
       };
     }
   }
 
-  // Validate snippet
+  // Validate snippet - validate is guaranteed to be assigned (either from cache or compiled)
   const valid = validate(parsedSnippet);
 
-  const result = {
+  const result: ValidationResult = {
     valid,
     syntax_valid: true,
     section,
@@ -348,19 +375,20 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
 
   if (!valid && validate.errors) {
     // Format errors with snippet context
-    result.errors = validate.errors.map(err => {
-      const errorPath = err.instancePath ? `${section}${err.instancePath}` : section;
+    const formattedErrors = validate.errors.map((err: ErrorObject) => {
+      const errorPath = err.instancePath ? `${section}${err.instancePath}` : section ?? '';
       return {
         path: errorPath,
-        message: err.message,
+        message: err.message ?? 'Unknown error',
         keyword: err.keyword,
-        params: err.params,
+        params: err.params as Record<string, unknown>,
         context: `in ${errorPath}`
       };
     });
+    result.errors = formattedErrors;
 
     // Add summary
-    result.summary = `Found ${result.errors.length} validation error(s) in section "${section}"`;
+    result.summary = `Found ${formattedErrors.length} validation error(s) in section "${section}"`;
   }
 
   return result;
@@ -368,15 +396,14 @@ export function validateSnippet(snippetYaml, fullSchema, version, sectionHint = 
 
 /**
  * Get validator cache stats (for monitoring/debugging)
- * @returns {Object} Cache statistics
  */
-export function getCacheStats() {
+export function getCacheStats(): ValidatorCacheStats {
   return validatorCache.getStats();
 }
 
 /**
  * Clear validator cache (useful for testing or version switches)
  */
-export function clearCache() {
+export function clearCache(): void {
   validatorCache.clear();
 }

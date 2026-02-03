@@ -6,12 +6,36 @@
 import yaml from 'js-yaml';
 import Table from 'cli-table3';
 import chalk from 'chalk';
+import type { OutputFormat, CliResult } from './types/index.js';
+
+export interface QueryResult {
+  field?: string;
+  path?: string;
+  value: unknown;
+  type?: string;
+  description?: string;
+}
+
+export interface QueryMetadata {
+  query: string;
+  file?: string;
+  version?: string;
+}
+
+export interface ValidationData {
+  valid: boolean;
+  errors?: Array<{
+    path?: string;
+    message?: string;
+    type?: string;
+  }>;
+}
 
 /**
  * Format output as JSON
  * Always returns valid JSON that can be parsed with JSON.parse()
  */
-export function formatJSON(data) {
+export function formatJSON(data: unknown): string {
   return JSON.stringify(data, null, 2);
 }
 
@@ -19,7 +43,7 @@ export function formatJSON(data) {
  * Format output as YAML
  * Always returns valid YAML that can be parsed with yaml.load()
  */
-export function formatYAML(data) {
+export function formatYAML(data: unknown): string {
   return yaml.dump(data, {
     indent: 2,
     lineWidth: 120,
@@ -31,7 +55,7 @@ export function formatYAML(data) {
  * Format query results as a table
  * Returns formatted table with box-drawing characters and colored headers
  */
-export function formatQueryTable(results, metadata) {
+export function formatQueryTable(results: QueryResult[], metadata: QueryMetadata): string {
   // Handle empty results
   if (!results || results.length === 0) {
     return `No results found for query: "${metadata.query}"`;
@@ -65,7 +89,7 @@ export function formatQueryTable(results, metadata) {
 /**
  * Format list-versions results as a table
  */
-export function formatVersionsTable(versions) {
+export function formatVersionsTable(versions: string[]): string {
   if (!versions || versions.length === 0) {
     return 'No versions found';
   }
@@ -88,7 +112,7 @@ export function formatVersionsTable(versions) {
 /**
  * Format validation results as a table
  */
-export function formatValidationTable(data) {
+export function formatValidationTable(data: ValidationData): string {
   if (data.valid) {
     return chalk.green('✓ Configuration is valid');
   }
@@ -107,13 +131,15 @@ export function formatValidationTable(data) {
     }
   });
 
-  data.errors.forEach(error => {
-    table.push([
-      error.path || 'root',
-      error.message || '',
-      error.type || ''
-    ]);
-  });
+  if (data.errors) {
+    data.errors.forEach(error => {
+      table.push([
+        error.path || 'root',
+        error.message || '',
+        error.type || ''
+      ]);
+    });
+  }
 
   output += table.toString();
   return output;
@@ -123,7 +149,7 @@ export function formatValidationTable(data) {
  * Helper function to format values for table display
  * Truncates long values and handles different types
  */
-function formatValue(value) {
+function formatValue(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
@@ -141,7 +167,7 @@ function formatValue(value) {
  * Main formatter function
  * Routes to appropriate formatter based on format option
  */
-export function formatOutput(data, format, command) {
+export function formatOutput(data: CliResult, format: OutputFormat, command: string): string {
   switch (format) {
     case 'json':
       return formatJSON(data);
@@ -152,11 +178,14 @@ export function formatOutput(data, format, command) {
     case 'table':
       // Route to appropriate table formatter based on command/data shape
       if (command === 'query' || data.results !== undefined) {
-        return formatQueryTable(data.results || [], data.metadata || {});
+        return formatQueryTable(
+          (data.results as QueryResult[]) || [],
+          (data as unknown as { metadata: QueryMetadata }).metadata || { query: '' }
+        );
       } else if (command === 'list-versions' || data.versions !== undefined) {
         return formatVersionsTable(data.versions || []);
       } else if (command === 'validate' || data.valid !== undefined) {
-        return formatValidationTable(data);
+        return formatValidationTable(data as unknown as ValidationData);
       } else {
         // Fallback: format entire data object as JSON in table
         return formatJSON(data);

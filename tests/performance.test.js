@@ -4,29 +4,23 @@
  */
 
 import { describe, it, beforeAll } from 'vitest';
-import { createServer } from '../src/server.js';
+import { createServer } from '../dist/server.js';
 
 describe('Smart Query Performance Tests', () => {
   let server;
-  let toolHandler;
+  let smartQueryTool;
 
   beforeAll(() => {
     server = createServer();
-    toolHandler = server._requestHandlers.get('tools/call');
+    // New SDK uses _registeredTools object with tool handlers
+    smartQueryTool = server._registeredTools['smart-query'];
   });
 
   async function measureQuery(query, version = 'main') {
     const startTotal = Date.now();
 
-    const request = {
-      method: 'tools/call',
-      params: {
-        name: 'smart-query',
-        arguments: { query, version }
-      }
-    };
-
-    const response = await toolHandler(request);
+    // Call the tool handler directly with arguments
+    const response = await smartQueryTool.handler({ query, version });
     const totalTime = Date.now() - startTotal;
 
     const text = response.content[0].text;

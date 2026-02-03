@@ -7,9 +7,25 @@
 import yaml from 'js-yaml';
 import { githubClient } from './github.js';
 import { validateSnippet } from './snippet-validator.js';
+import type { CliQueryOptions, CliValidateOptions, CliResult } from './types/index.js';
+
+interface YamlInfoItem {
+  path: string;
+  key: string;
+  value: unknown;
+  isLeaf: boolean;
+}
+
+interface QueryResultItem {
+  field: string;
+  value: unknown;
+  type: string;
+  path: string;
+  description: string;
+}
 
 // Helper function to get the type of a value
-function getType(value) {
+function getType(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
   if (typeof value === 'object') return 'object';
@@ -20,7 +36,7 @@ function getType(value) {
 }
 
 // Helper function to rank search results
-function rankResult(item, searchTerm) {
+function rankResult(item: YamlInfoItem, searchTerm: string): number {
   const pathLower = item.path.toLowerCase();
   const keyLower = item.key.toLowerCase();
   let score = 0;
@@ -61,18 +77,18 @@ function rankResult(item, searchTerm) {
  * Handle query command
  * Searches for configuration fields in vCluster YAML
  */
-export async function handleQuery(query, options) {
+export async function handleQuery(query: string, options: CliQueryOptions): Promise<CliResult> {
   const version = options.version || 'main';
   const fileName = options.file || 'chart/values.yaml';
 
-  let yamlData;
+  let yamlData: Record<string, unknown>;
 
   try {
-    yamlData = await githubClient.getYamlContent(fileName, version);
+    yamlData = await githubClient.getYamlContent(fileName, version) as Record<string, unknown>;
   } catch (error) {
     return {
       success: false,
-      error: `Could not load ${fileName} from GitHub (version: ${version}). Error: ${error.message}`,
+      error: `Could not load ${fileName} from GitHub (version: ${version}). Error: ${error instanceof Error ? error.message : String(error)}`,
       metadata: {
         query,
         file: fileName,
@@ -82,13 +98,13 @@ export async function handleQuery(query, options) {
   }
 
   const searchTerm = query.toLowerCase();
-  const results = [];
+  const results: YamlInfoItem[] = [];
 
   // Helper function to extract all paths and values
-  function extractInfo(obj, path = '') {
-    const info = [];
+  function extractInfo(obj: unknown, path: string = ''): YamlInfoItem[] {
+    const info: YamlInfoItem[] = [];
     if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-      for (const [key, value] of Object.entries(obj)) {
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
         const currentPath = path ? `${path}.${key}` : key;
 
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -145,7 +161,7 @@ export async function handleQuery(query, options) {
   });
 
   // Format results for CLI output
-  const formattedResults = results.slice(0, 50).map(item => ({
+  const formattedResults: QueryResultItem[] = results.slice(0, 50).map(item => ({
     field: item.path,
     value: item.value,
     type: getType(item.value),
@@ -170,7 +186,7 @@ export async function handleQuery(query, options) {
  * Handle list-versions command
  * Lists available vCluster versions from GitHub
  */
-export async function handleListVersions() {
+export async function handleListVersions(): Promise<CliResult> {
   try {
     const tags = await githubClient.getTags();
 
@@ -191,7 +207,7 @@ export async function handleListVersions() {
   } catch (error) {
     return {
       success: false,
-      error: `Failed to fetch versions: ${error.message}`,
+      error: `Failed to fetch versions: ${error instanceof Error ? error.message : String(error)}`,
       versions: [],
       metadata: {
         totalCount: 0,
@@ -201,17 +217,22 @@ export async function handleListVersions() {
   }
 }
 
+interface ValidationError {
+  path: string;
+  message: string;
+  type: string;
+}
+
 /**
  * Handle validate command
  * Validates vCluster YAML configuration
  */
-export async function handleValidate(content, options) {
+export async function handleValidate(content: string, options: CliValidateOptions): Promise<CliResult> {
   const version = options.version || 'main';
 
   // Validate YAML syntax first
-  let yamlData;
   try {
-    yamlData = yaml.load(content);
+    yaml.load(content);
   } catch (error) {
     return {
       success: false,
@@ -219,7 +240,7 @@ export async function handleValidate(content, options) {
       errors: [
         {
           path: 'root',
-          message: error.message,
+          message: error instanceof Error ? error.message : String(error),
           type: 'syntax'
         }
       ],
@@ -233,7 +254,7 @@ export async function handleValidate(content, options) {
   // Fetch schema for validation
   try {
     const schemaContent = await githubClient.getFileContent('chart/values.schema.json', version);
-    const fullSchema = JSON.parse(schemaContent);
+    const fullSchema = JSON.parse(schemaContent) as Record<string, unknown>;
 
     // Use snippet validator
     const result = validateSnippet(
@@ -254,8 +275,8 @@ export async function handleValidate(content, options) {
       };
     } else {
       // Format errors for CLI
-      const errors = result.errors.map(err => ({
-        path: err.instancePath || err.dataPath || 'root',
+      const errors: ValidationError[] = (result.errors || []).map(err => ({
+        path: err.path || 'root',
         message: err.message || 'Validation error',
         type: err.keyword || 'validation'
       }));
@@ -277,7 +298,7 @@ export async function handleValidate(content, options) {
       errors: [
         {
           path: 'root',
-          message: `Failed to load schema: ${error.message}`,
+          message: `Failed to load schema: ${error instanceof Error ? error.message : String(error)}`,
           type: 'schema-error'
         }
       ],

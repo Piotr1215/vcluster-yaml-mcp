@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { toolHandlers, executeToolHandler } from '../src/tool-registry.js';
+import { toolHandlers, executeToolHandler } from '../dist/tool-registry.js';
 
 describe('Tool Registry', () => {
   describe('toolHandlers', () => {

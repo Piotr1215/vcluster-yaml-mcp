@@ -149,8 +149,8 @@ describe('Binary Execution', () => {
 
     // Read the CLI binary source file
     const packageDir = join(testDir, 'node_modules', 'vcluster-yaml-mcp-server');
-    const cliBinSourcePath = join(packageDir, 'src', 'cli.js');
-    const mcpBinSourcePath = join(packageDir, 'src', 'index.js');
+    const cliBinSourcePath = join(packageDir, 'dist', 'cli.js');
+    const mcpBinSourcePath = join(packageDir, 'dist', 'index.js');
 
     // Read and verify CLI shebang
     const cliContent = await fs.readFile(cliBinSourcePath, 'utf-8');

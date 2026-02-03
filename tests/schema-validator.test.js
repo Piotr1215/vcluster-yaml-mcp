@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { validateConfigAgainstSchema } from '../src/schema-validator.js';
+import { validateConfigAgainstSchema } from '../dist/schema-validator.js';
 
 describe('schema-validator.js - Edge Cases and Quirks', () => {
 

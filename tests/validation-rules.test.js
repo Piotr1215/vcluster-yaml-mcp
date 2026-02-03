@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractValidationRulesFromComments } from '../src/validation-rules.js';
+import { extractValidationRulesFromComments } from '../dist/validation-rules.js';
 
 describe('Validation Rules Extraction', () => {
   describe('extractValidationRulesFromComments', () => {

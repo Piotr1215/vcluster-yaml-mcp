@@ -1,3 +1,19 @@
+# Build stage - compile TypeScript
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files and install all dependencies (including devDependencies for tsc)
+# Use --ignore-scripts to skip prepare hook (we'll build explicitly after copying source)
+COPY package*.json ./
+COPY tsconfig.json ./
+RUN npm ci --ignore-scripts
+
+# Copy source and compile
+COPY src/ ./src/
+RUN npm run build
+
+# Production stage - minimal runtime
 FROM node:20-alpine
 
 # Build arguments for version information
@@ -22,14 +38,15 @@ ENV BUILD_DATE=${BUILD_DATE}
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install production dependencies only
+# Use --ignore-scripts to skip prepare hook (build already done in builder stage)
 COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts
 
-# Install dependencies
-RUN npm ci --only=production
+# Copy compiled JavaScript from builder
+COPY --from=builder /app/dist/ ./dist/
 
-# Copy source code and changelog
-COPY src/ ./src/
+# Copy changelog for get-changelog tool
 COPY CHANGELOG.md ./
 
 # Expose port
@@ -40,5 +57,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Run HTTP server with OpenTelemetry instrumentation
-# Load instrumentation before the app using --import flag
-CMD ["node", "--import", "./src/instrumentation.js", "./src/http-server.js"]
+CMD ["node", "--import", "./dist/instrumentation.js", "./dist/http-server.js"]

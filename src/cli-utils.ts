@@ -6,17 +6,21 @@
 import { readFile } from 'fs/promises';
 import { stdin } from 'process';
 
+export interface ContentSource {
+  content: string;
+  source: string;
+}
+
 /**
  * Read content from stdin
  * Used for piping content to CLI commands
- * @returns {Promise<string>} The content read from stdin
  */
-export async function readStdin() {
+export async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = '';
 
     stdin.setEncoding('utf8');
-    stdin.on('data', chunk => data += chunk);
+    stdin.on('data', (chunk: string) => data += chunk);
     stdin.on('end', () => resolve(data));
     stdin.on('error', reject);
   });
@@ -24,10 +28,8 @@ export async function readStdin() {
 
 /**
  * Read content from a file or stdin based on the file argument
- * @param {string|undefined} file - File path, '-' for stdin, or undefined for stdin
- * @returns {Promise<{content: string, source: string}>} The content and its source
  */
-export async function readContentSource(file) {
+export async function readContentSource(file?: string): Promise<ContentSource> {
   // Read from stdin if no file provided or file is '-'
   if (!file || file === '-') {
     // If no file argument provided (not even '-'), check if we're in interactive mode
@@ -57,6 +59,6 @@ export async function readContentSource(file) {
     const content = await readFile(file, 'utf-8');
     return { content, source: file };
   } catch (error) {
-    throw new Error(`Cannot read file '${file}': ${error.message}`);
+    throw new Error(`Cannot read file '${file}': ${error instanceof Error ? error.message : String(error)}`);
   }
 }
