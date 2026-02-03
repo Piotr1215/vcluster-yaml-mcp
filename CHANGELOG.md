@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.1] - 2026-02-03
+
+### Fixed
+- Smart-query NLP now handles full sentence queries with stop words
+- Changed keyword matching from AND to OR logic for natural language support
+
 ## [1.4.0] - 2026-02-03
 
 ### Changed

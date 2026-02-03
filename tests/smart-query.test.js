@@ -137,4 +137,42 @@ describe('Smart Query Feature', () => {
       }
     });
   });
+
+  describe('Stop Word Filtering (NLP)', () => {
+    it('should find results for full sentence queries with stop words', async () => {
+      // This query previously returned 0 results because ALL words had to match
+      const response = await callTool(server, 'smart-query', {
+        query: 'how to sync ingresses from virtual to host'
+      });
+      expect(response.content[0].text).toBeDefined();
+      // Should find results for "sync" or "ingresses" or "virtual" or "host"
+      expect(response.content[0].text).not.toContain('No matches found');
+    });
+
+    it('should handle queries with only stop words gracefully', async () => {
+      const response = await callTool(server, 'smart-query', {
+        query: 'how to the'
+      });
+      expect(response.content[0].text).toBeDefined();
+      // Should not crash, may return no results
+    });
+
+    it('should still work with single meaningful keyword', async () => {
+      const response = await callTool(server, 'smart-query', {
+        query: 'ingresses'
+      });
+      expect(response.content[0].text).toBeDefined();
+      expect(response.content[0].text.toLowerCase()).toContain('ingress');
+    });
+
+    it('should find results for natural language about replication', async () => {
+      const response = await callTool(server, 'smart-query', {
+        query: 'what is the replicas setting for control plane'
+      });
+      expect(response.content[0].text).toBeDefined();
+      // Should find results for "replicas" or "control" or "plane"
+      const text = response.content[0].text.toLowerCase();
+      expect(text).toMatch(/replica|control|plane/);
+    });
+  });
 });
