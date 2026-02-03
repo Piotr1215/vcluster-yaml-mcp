@@ -31,11 +31,15 @@ export async function createTestDir() {
  */
 export async function packPackage() {
   // Run npm pack in project root
-  const packResult = await execa('npm', ['pack'], {
+  // Use --ignore-scripts to avoid prepare hook polluting stdout (dist/ already built by npm ci)
+  const packResult = await execa('npm', ['pack', '--ignore-scripts'], {
     cwd: PROJECT_ROOT,
   });
 
-  const tarballName = packResult.stdout.trim();
+  // Extract tarball name - last non-empty line of output
+  // (prepare script may still output messages even with --ignore-scripts in some npm versions)
+  const lines = packResult.stdout.trim().split('\n').filter(line => line.trim());
+  const tarballName = lines[lines.length - 1];
   const tarballPath = join(PROJECT_ROOT, tarballName);
 
   return { tarballName, tarballPath };
@@ -55,7 +59,8 @@ export async function installLocal(tarballPath, installDir) {
   );
 
   // Install the tarball
-  const installResult = await execa('npm', ['install', tarballPath], {
+  // Use --ignore-scripts to skip prepare hook (tarball already contains built dist/)
+  const installResult = await execa('npm', ['install', '--ignore-scripts', tarballPath], {
     cwd: installDir,
   });
 
@@ -69,9 +74,11 @@ export async function installLocal(tarballPath, installDir) {
  * @returns {Promise<object>} Install result
  */
 export async function installGlobal(tarballPath, installDir) {
+  // Use --ignore-scripts to skip prepare hook (tarball already contains built dist/)
   const installResult = await execa('npm', [
     'install',
     '--global',
+    '--ignore-scripts',
     '--prefix', installDir,
     tarballPath
   ], {
