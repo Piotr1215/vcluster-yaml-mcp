@@ -280,6 +280,64 @@ describe('YAML Query Helpers', () => {
 
       expect(sorted[0].path).toBe('enabled');
     });
+
+    it('should rank multi-keyword matches higher than single-keyword', () => {
+      const results = [
+        { path: 'sync.toHost.ingresses.enabled', key: 'enabled', value: true, isLeaf: true },
+        { path: 'sync.enabled', key: 'enabled', value: false, isLeaf: true },
+        { path: 'networking.advanced.clusterDomain', key: 'clusterDomain', value: 'cluster.local', isLeaf: true }
+      ];
+
+      const sorted = sortByRelevance(results, 'sync ingresses host');
+
+      expect(sorted[0].path).toBe('sync.toHost.ingresses.enabled');
+    });
+
+    it('should boost results matching ALL keywords over partial matches', () => {
+      const results = [
+        { path: 'sync.toHost.ingresses', key: 'ingresses', value: {}, isLeaf: false },
+        { path: 'sync.fromHost.nodes', key: 'nodes', value: {}, isLeaf: false },
+        { path: 'controlPlane.ingress', key: 'ingress', value: {}, isLeaf: false }
+      ];
+
+      const sorted = sortByRelevance(results, 'sync ingresses host');
+
+      expect(sorted[0].path).toBe('sync.toHost.ingresses');
+    });
+
+    it('should handle dot notation queries with exact matching', () => {
+      const results = [
+        { path: 'sync.toHost.ingresses.enabled', key: 'enabled', value: true, isLeaf: true },
+        { path: 'sync.toHost.ingresses', key: 'ingresses', value: {}, isLeaf: false },
+        { path: 'controlPlane.ingress.enabled', key: 'enabled', value: false, isLeaf: true }
+      ];
+
+      const sorted = sortByRelevance(results, 'sync.toHost.ingresses');
+
+      expect(sorted[0].path).toBe('sync.toHost.ingresses');
+    });
+
+    it('should give extra boost for key matches in multi-keyword queries', () => {
+      const results = [
+        { path: 'sync.toHost.ingresses', key: 'ingresses', value: {}, isLeaf: false },
+        { path: 'sync.toHost.services.enabled', key: 'enabled', value: true, isLeaf: true }
+      ];
+
+      const sorted = sortByRelevance(results, 'sync ingresses');
+
+      expect(sorted[0].path).toBe('sync.toHost.ingresses');
+    });
+
+    it('should prefer leaf nodes as tiebreaker when path scores equal', () => {
+      const results = [
+        { path: 'sync.toHost.configMaps', key: 'configMaps', value: {}, isLeaf: false },
+        { path: 'sync.toHost.secrets', key: 'secrets', value: true, isLeaf: true }
+      ];
+
+      const sorted = sortByRelevance(results, 'sync secrets');
+
+      expect(sorted[0].key).toBe('secrets');
+    });
   });
 });
 

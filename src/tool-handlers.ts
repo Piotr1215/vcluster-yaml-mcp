@@ -468,28 +468,45 @@ export function sortByRelevance(results: YamlInfoItem[], searchTerm: string): Ya
 }
 
 /**
- * Rank search result
- * Pure function
+ * Rank search result - multi-keyword aware
  */
 function rankResult(item: YamlInfoItem, searchTerm: string): number {
   let score = 0;
   const pathLower = item.path.toLowerCase();
   const keyLower = item.key.toLowerCase();
+  const termLower = searchTerm.toLowerCase();
 
-  // Exact path match (highest priority)
-  if (pathLower === searchTerm) score += 100;
+  if (termLower.includes('.')) {
+    if (pathLower === termLower) score += 100;
+    if (pathLower.includes(termLower)) score += 20;
+    if (item.isLeaf) score += 5;
+    return score;
+  }
 
-  // Exact key match
-  if (keyLower === searchTerm) score += 50;
+  const stopWords = new Set([
+    'how', 'to', 'the', 'a', 'an', 'is', 'are', 'from', 'what', 'which',
+    'for', 'with', 'in', 'on', 'at', 'by', 'and', 'or', 'of', 'do', 'does'
+  ]);
+  const keywords = searchTerm.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
 
-  // Path contains exact term
-  if (pathLower.includes(searchTerm)) score += 20;
+  if (keywords.length > 1) {
+    let matchCount = 0;
+    for (const kw of keywords) {
+      if (pathLower.includes(kw) || keyLower.includes(kw)) {
+        matchCount++;
+        if (keyLower.includes(kw)) score += 15;
+      }
+    }
+    score += matchCount * 25;
+    if (matchCount === keywords.length) score += 50;
+  } else {
+    const term = keywords[0] ?? searchTerm;
+    if (pathLower === term) score += 100;
+    if (keyLower === term) score += 50;
+    if (pathLower.includes(term)) score += 20;
+    if (keyLower.includes(term)) score += 10;
+  }
 
-  // Key contains term
-  if (keyLower.includes(searchTerm)) score += 10;
-
-  // Leaf nodes are more relevant
   if (item.isLeaf) score += 5;
-
   return score;
 }
