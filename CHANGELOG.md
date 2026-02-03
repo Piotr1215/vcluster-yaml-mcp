@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0] - 2026-02-03
+
+### Changed
+- Migrate entire codebase from JavaScript to TypeScript
+- Multi-stage Docker build for TypeScript compilation
+- Strict type checking enabled (`strict: true`, `noUncheckedIndexedAccess: true`)
+
+### Fixed
+- Test helpers use `--ignore-scripts` for npm pack/install operations
+
 ## [1.3.2] - 2026-02-01
 
 ### Fixed
