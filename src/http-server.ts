@@ -22,7 +22,7 @@ promClient.collectDefaultMetrics({ register });
 const mcpRequestCounter = new promClient.Counter({
   name: 'mcp_requests_total',
   help: 'Total MCP requests',
-  labelNames: ['method', 'status'],
+  labelNames: ['method', 'status', 'mcp_method', 'tool_name'],
   registers: [register]
 });
 
@@ -118,7 +118,10 @@ interface JsonRpcRequest {
 const mcpHandler = async (req: Request, res: Response): Promise<void> => {
   const start = Date.now();
   const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  console.log(`MCP ${req.method} request from ${clientIp}`);
+  const jsonrpcPreview = req.body as JsonRpcRequest;
+  const mcpMethodLog = jsonrpcPreview?.method || 'unknown';
+  const toolLog = (mcpMethodLog === 'tools/call' && jsonrpcPreview?.params?.name) ? ` tool=${jsonrpcPreview.params.name}` : '';
+  console.log(`MCP ${req.method} ${mcpMethodLog}${toolLog} from ${clientIp}`);
 
   // Extract JSONRPC request details for tracing
   const jsonrpcRequest = req.body as JsonRpcRequest;
@@ -161,10 +164,12 @@ const mcpHandler = async (req: Request, res: Response): Promise<void> => {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
 
-      mcpRequestCounter.inc({ method: req.method, status: 'success' });
+      const toolName = (mcpMethod === 'tools/call' && mcpParams?.name) ? mcpParams.name : '';
+      mcpRequestCounter.inc({ method: req.method, status: 'success', mcp_method: mcpMethod, tool_name: toolName });
       span.setStatus({ code: SpanStatusCode.OK });
     } catch (error) {
-      mcpRequestCounter.inc({ method: req.method, status: 'error' });
+      const toolNameErr = (mcpMethod === 'tools/call' && mcpParams?.name) ? mcpParams.name : '';
+      mcpRequestCounter.inc({ method: req.method, status: 'error', mcp_method: mcpMethod, tool_name: toolNameErr });
       const errorMessage = error instanceof Error ? error.message : String(error);
       span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
       span.recordException(error instanceof Error ? error : new Error(errorMessage));
