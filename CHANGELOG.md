@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4] - 2026-02-22
+
+### Fixed
+- Coverage config now targets `.ts` source files (was `.js` since TypeScript migration)
+- Docker image now reports correct version in `get-server-info`
+- Release workflow passes `IMAGE_VERSION`, `GIT_SHA`, `BUILD_DATE` build args to Docker
+
 ## [1.4.3] - 2026-02-22
 
 ### Added
