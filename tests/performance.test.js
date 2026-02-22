@@ -4,7 +4,7 @@
  */
 
 import { describe, it, beforeAll } from 'vitest';
-import { createServer } from '../dist/server.js';
+import { createServer } from '../src/server.ts';
 
 describe('Smart Query Performance Tests', () => {
   let server;

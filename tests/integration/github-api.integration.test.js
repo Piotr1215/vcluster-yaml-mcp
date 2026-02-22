@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import fc from 'fast-check';
-import { githubClient } from '../../dist/github.js';
+import { githubClient } from '../../src/github.ts';
 
 describe('github.js - Security Edge Cases and Quirks', () => {
 

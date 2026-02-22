@@ -15,7 +15,7 @@ import {
   searchYaml,
   findSimilarPaths,
   sortByRelevance
-} from '../dist/tool-handlers.js';
+} from '../src/tool-handlers.ts';
 
 describe('Response Builders', () => {
   describe('buildSuccessResponse', () => {

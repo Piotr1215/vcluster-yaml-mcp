@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createServer } from '../dist/server.js';
+import { createServer } from '../src/server.ts';
 
 /**
  * Helper to call a tool handler

@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { validateSnippet } from '../dist/snippet-validator.js';
-import { githubClient } from '../dist/github.js';
+import { validateSnippet } from '../src/snippet-validator.ts';
+import { githubClient } from '../src/github.ts';
 
 describe('Validation Error Detection', () => {
   let fullSchema;

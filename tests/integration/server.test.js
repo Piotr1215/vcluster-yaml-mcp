@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createServer } from '../../dist/server.js';
+import { createServer } from '../../src/server.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
