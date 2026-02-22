@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.3] - 2026-02-22
+
+### Added
+- `mcp_method` and `tool_name` labels on `mcp_requests_total` Prometheus counter
+- Console logs now include MCP method and tool name
+
 ## [1.4.2] - 2026-02-03
 
 ### Added
