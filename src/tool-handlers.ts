@@ -353,11 +353,33 @@ export async function handleExtractRules(
  */
 export async function handleValidateConfig(
   args: ValidateConfigOptions,
-  githubClient: GitHubClientInterface
+  githubClient: GitHubClientInterface,
+  elicitor?: ElicitInputFn
 ): Promise<McpToolResponse> {
-  const { version = 'main', content, file } = args;
+  const { version = 'main', file } = args;
+  let { content } = args;
 
-  // Get YAML content
+  if (!content && !file && elicitor) {
+    const result = await elicitor({
+      message: 'Paste the vCluster YAML you want to validate:',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          yaml_content: {
+            type: 'string',
+            title: 'YAML Content',
+            description: 'vCluster configuration YAML to validate'
+          }
+        },
+        required: ['yaml_content']
+      }
+    });
+
+    if (result.action === 'accept' && result.content?.yaml_content) {
+      content = String(result.content.yaml_content);
+    }
+  }
+
   let yamlContent: string;
   if (content) {
     yamlContent = content;

@@ -97,7 +97,17 @@ export function createServer(): McpServer {
       }
     },
     async ({ file, content, version }) => {
-      const result = await handleValidateConfig({ file, content, version }, githubClient);
+      let elicitor;
+      if (!content && !file) {
+        elicitor = async (params: Parameters<typeof server.server.elicitInput>[0]) => {
+          try {
+            return await server.server.elicitInput(params);
+          } catch {
+            return { action: 'cancel' as const };
+          }
+        };
+      }
+      const result = await handleValidateConfig({ file, content, version }, githubClient, elicitor);
       return result;
     }
   );

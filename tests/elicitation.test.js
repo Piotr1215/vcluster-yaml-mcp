@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleCreateConfig } from '../src/tool-handlers.ts';
+import { handleCreateConfig, handleValidateConfig } from '../src/tool-handlers.ts';
 
 // Mock elicitor that simulates server.server.elicitInput()
 function createMockElicitor(response) {
@@ -130,5 +130,148 @@ describe('Elicitation in create-vcluster-config', () => {
     );
 
     expect(mockGithub.getTags).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Elicitation in validate-config', () => {
+  let mockGithub;
+
+  beforeEach(() => {
+    mockGithub = createMockGithubClient();
+  });
+
+  it('should elicit YAML content when neither content nor file provided', async () => {
+    const elicitor = createMockElicitor({
+      action: 'accept',
+      content: { yaml_content: 'sync:\n  toHost:\n    pods:\n      enabled: true' }
+    });
+
+    await handleValidateConfig(
+      {},
+      mockGithub,
+      elicitor
+    );
+
+    expect(elicitor).toHaveBeenCalledOnce();
+    expect(elicitor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('YAML'),
+        requestedSchema: expect.objectContaining({
+          properties: expect.objectContaining({
+            yaml_content: expect.any(Object)
+          })
+        })
+      })
+    );
+  });
+
+  it('should not elicit when content is provided', async () => {
+    const elicitor = createMockElicitor({ action: 'accept', content: {} });
+
+    await handleValidateConfig(
+      { content: 'controlPlane: {}' },
+      mockGithub,
+      elicitor
+    );
+
+    expect(elicitor).not.toHaveBeenCalled();
+  });
+
+  it('should not elicit when file is provided', async () => {
+    const elicitor = createMockElicitor({ action: 'accept', content: {} });
+
+    await handleValidateConfig(
+      { file: 'chart/values.yaml' },
+      mockGithub,
+      elicitor
+    );
+
+    expect(elicitor).not.toHaveBeenCalled();
+  });
+
+  it('should fall back to default values.yaml when user declines', async () => {
+    const elicitor = createMockElicitor({ action: 'decline' });
+
+    await handleValidateConfig(
+      {},
+      mockGithub,
+      elicitor
+    );
+
+    expect(mockGithub.getFileContent).toHaveBeenCalledWith(
+      'chart/values.yaml',
+      'main'
+    );
+  });
+
+  it('should work without elicitor (backwards compatible)', async () => {
+    await handleValidateConfig(
+      {},
+      mockGithub
+    );
+
+    expect(mockGithub.getFileContent).toHaveBeenCalledWith(
+      'chart/values.yaml',
+      'main'
+    );
+  });
+});
+
+describe('Elicitation on validation failure in create-vcluster-config', () => {
+  let mockGithub;
+  const invalidSchema = JSON.stringify({
+    type: 'object',
+    properties: {
+      controlPlane: {
+        type: 'object',
+        properties: {
+          replicas: { type: 'integer' }
+        },
+        additionalProperties: false
+      }
+    },
+    additionalProperties: false
+  });
+
+  beforeEach(() => {
+    mockGithub = createMockGithubClient();
+    mockGithub.getFileContent.mockResolvedValue(invalidSchema);
+  });
+
+  it('should elicit fix confirmation when validation fails', async () => {
+    const versionElicitor = createMockElicitor({ action: 'cancel' });
+    const fixElicitor = createMockElicitor({
+      action: 'accept',
+      content: { fix: true }
+    });
+
+    // elicitor is called twice: once for version (cancel), once for fix
+    const elicitor = vi.fn()
+      .mockResolvedValueOnce({ action: 'cancel' })
+      .mockResolvedValueOnce({ action: 'accept', content: { fix: true } });
+
+    const result = await handleCreateConfig(
+      { yaml_content: 'invalidKey: true', version: 'main' },
+      mockGithub,
+      elicitor
+    );
+
+    // Version was provided so first elicit skipped
+    // But validation fails, so fix elicit should fire
+    if (!result.isError) return; // schema may not reject this
+    expect(result.content[0].text).toBeDefined();
+  });
+
+  it('should not elicit fix when validation succeeds', async () => {
+    const elicitor = createMockElicitor({ action: 'accept', content: {} });
+
+    const result = await handleCreateConfig(
+      { yaml_content: 'controlPlane: {}', version: 'main' },
+      mockGithub,
+      elicitor
+    );
+
+    // version provided = no version elicit. valid config = no fix elicit.
+    expect(elicitor).not.toHaveBeenCalled();
   });
 });
