@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.0] - 2026-03-15
+
+### Added
+- MCP elicitation support (Claude Code 2.1.76+)
+  - `create-vcluster-config`: prompts user to pick version from GitHub tags when omitted
+  - `validate-config`: prompts user for YAML content when called without input
+  - Clients without elicitation support silently fall back to defaults
+
+### Updated
+- @modelcontextprotocol/sdk 1.25.2 -> 1.26.0
+- ajv 8.17.1 -> 8.18.0
+- hono 4.11.7 -> 4.12.7
+- tar 7.5.3 -> 7.5.11
+- rollup 4.46.2 -> 4.59.0
+
+### Fixed
+- Validation error tests updated for upstream vCluster schema changes
+
 ## [1.4.4] - 2026-02-22
 
 ### Fixed
