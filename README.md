@@ -185,7 +185,7 @@ create-vcluster-config --yaml_content="<generated-yaml>" --description="Node syn
 // [your YAML here]
 ```
 
-When `version` is omitted and the MCP client supports [elicitation](https://modelcontextprotocol.io/docs/concepts/elicitation), the server prompts the user to pick from available GitHub tags before validating. Clients without elicitation support silently fall back to `main`.
+When `version` is omitted and the MCP client supports [elicitation](https://modelcontextprotocol.io/docs/concepts/elicitation) (Claude Code 2.1.76+), the server prompts the user to pick from available GitHub tags before validating. Clients without elicitation support silently fall back to `main`.
 
 **validate-config** - Validate existing YAML configs
 ```javascript
