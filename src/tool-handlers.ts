@@ -14,7 +14,8 @@ import type {
   CreateConfigOptions,
   QueryOptions,
   ValidateConfigOptions,
-  ExtractRulesOptions
+  ExtractRulesOptions,
+  ElicitInputFn
 } from './types/index.js';
 
 // ============================================================================
@@ -194,9 +195,38 @@ interface JsonSchema {
  */
 export async function handleCreateConfig(
   args: CreateConfigOptions,
-  githubClient: GitHubClientInterface
+  githubClient: GitHubClientInterface,
+  elicitor?: ElicitInputFn
 ): Promise<McpToolResponse> {
-  const { yaml_content, description, version = 'main' } = args;
+  const { yaml_content, description } = args;
+  let version = args.version;
+
+  if (!version && elicitor) {
+    const tags = await githubClient.getTags();
+    const recentTags = tags.slice(0, 10);
+
+    const result = await elicitor({
+      message: 'Select a vCluster version for config validation:',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          version: {
+            type: 'string',
+            title: 'Version',
+            description: `Available: ${recentTags.join(', ')}`,
+            default: recentTags[0] || 'main'
+          }
+        },
+        required: ['version']
+      }
+    });
+
+    if (result.action === 'accept' && result.content?.version) {
+      version = String(result.content.version);
+    }
+  }
+
+  version = version || 'main';
 
   const schemaContent = await githubClient.getFileContent('chart/values.schema.json', version);
   const fullSchema = JSON.parse(schemaContent) as JsonSchema;
@@ -205,7 +235,7 @@ export async function handleCreateConfig(
     yaml_content,
     fullSchema,
     version,
-    null  // Auto-detect section
+    null
   );
 
   const formattedResponse = formatValidationResult(validationResult, {

@@ -67,7 +67,17 @@ export function createServer(): McpServer {
       }
     },
     async ({ yaml_content, description, version }) => {
-      const result = await handleCreateConfig({ yaml_content, description, version }, githubClient);
+      let elicitor;
+      if (!version) {
+        elicitor = async (params: Parameters<typeof server.server.elicitInput>[0]) => {
+          try {
+            return await server.server.elicitInput(params);
+          } catch {
+            return { action: 'cancel' as const };
+          }
+        };
+      }
+      const result = await handleCreateConfig({ yaml_content, description, version }, githubClient, elicitor);
       return result;
     }
   );
