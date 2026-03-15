@@ -14,7 +14,8 @@ import type {
   CreateConfigOptions,
   QueryOptions,
   ValidateConfigOptions,
-  ExtractRulesOptions
+  ExtractRulesOptions,
+  ElicitInputFn
 } from './types/index.js';
 
 // ============================================================================
@@ -194,9 +195,38 @@ interface JsonSchema {
  */
 export async function handleCreateConfig(
   args: CreateConfigOptions,
-  githubClient: GitHubClientInterface
+  githubClient: GitHubClientInterface,
+  elicitor?: ElicitInputFn
 ): Promise<McpToolResponse> {
-  const { yaml_content, description, version = 'main' } = args;
+  const { yaml_content, description } = args;
+  let version = args.version;
+
+  if (!version && elicitor) {
+    const tags = await githubClient.getTags();
+    const recentTags = tags.slice(0, 10);
+
+    const result = await elicitor({
+      message: 'Select a vCluster version for config validation:',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          version: {
+            type: 'string',
+            title: 'Version',
+            description: `Available: ${recentTags.join(', ')}`,
+            default: recentTags[0] || 'main'
+          }
+        },
+        required: ['version']
+      }
+    });
+
+    if (result.action === 'accept' && result.content?.version) {
+      version = String(result.content.version);
+    }
+  }
+
+  version = version || 'main';
 
   const schemaContent = await githubClient.getFileContent('chart/values.schema.json', version);
   const fullSchema = JSON.parse(schemaContent) as JsonSchema;
@@ -205,7 +235,7 @@ export async function handleCreateConfig(
     yaml_content,
     fullSchema,
     version,
-    null  // Auto-detect section
+    null
   );
 
   const formattedResponse = formatValidationResult(validationResult, {
@@ -323,11 +353,33 @@ export async function handleExtractRules(
  */
 export async function handleValidateConfig(
   args: ValidateConfigOptions,
-  githubClient: GitHubClientInterface
+  githubClient: GitHubClientInterface,
+  elicitor?: ElicitInputFn
 ): Promise<McpToolResponse> {
-  const { version = 'main', content, file } = args;
+  const { version = 'main', file } = args;
+  let { content } = args;
 
-  // Get YAML content
+  if (!content && !file && elicitor) {
+    const result = await elicitor({
+      message: 'Paste the vCluster YAML you want to validate:',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          yaml_content: {
+            type: 'string',
+            title: 'YAML Content',
+            description: 'vCluster configuration YAML to validate'
+          }
+        },
+        required: ['yaml_content']
+      }
+    });
+
+    if (result.action === 'accept' && result.content?.yaml_content) {
+      content = String(result.content.yaml_content);
+    }
+  }
+
   let yamlContent: string;
   if (content) {
     yamlContent = content;

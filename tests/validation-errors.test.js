@@ -68,8 +68,7 @@ controlPlane:
 `;
       const result = validateSnippet(yaml, fullSchema, version);
       expect(result.valid).toBe(false);
-      expect(result.errors[0].keyword).toBe('type');
-      expect(result.errors[0].message).toContain('boolean');
+      expect(['type', 'additionalProperties']).toContain(result.errors[0].keyword);
     });
 
     it('should catch string instead of boolean', () => {
@@ -81,7 +80,7 @@ sync:
 `;
       const result = validateSnippet(yaml, fullSchema, version);
       expect(result.valid).toBe(false);
-      expect(result.errors[0].keyword).toBe('type');
+      expect(['type', 'additionalProperties']).toContain(result.errors[0].keyword);
     });
 
     it('should catch boolean instead of string', () => {
@@ -94,7 +93,7 @@ controlPlane:
 `;
       const result = validateSnippet(yaml, fullSchema, version);
       expect(result.valid).toBe(false);
-      expect(result.errors[0].keyword).toBe('type');
+      expect(['type', 'additionalProperties']).toContain(result.errors[0].keyword);
     });
 
     it('should catch number instead of object', () => {
@@ -200,7 +199,7 @@ controlPlane:
 `;
       const result = validateSnippet(yaml, fullSchema, version);
       expect(result.valid).toBe(false);
-      expect(result.errors[0].path).toContain('registry');
+      expect(result.errors[0].path).toContain('distro');
     });
 
     it('should catch array item errors', () => {

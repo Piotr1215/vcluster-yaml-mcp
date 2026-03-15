@@ -110,6 +110,14 @@ export interface CreateConfigOptions {
   version?: string;
 }
 
+export interface ElicitResult {
+  action: 'accept' | 'decline' | 'cancel';
+  content?: Record<string, string | number | boolean | string[]>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ElicitInputFn = (params: any) => Promise<ElicitResult>;
+
 export interface ValidateConfigOptions {
   file?: string;
   content?: string;
