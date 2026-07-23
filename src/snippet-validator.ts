@@ -267,7 +267,16 @@ export function validateSnippet(
   if (isFullDocument) {
     // Multiple top-level sections = validate as full document
     section = '__full_document__';
-    cacheKey = `__full__:${version}`;
+    // The synthetic schema below is built from exactly the sections present in
+    // this document and uses additionalProperties:false. The cache key must
+    // therefore encode that section set. A fixed `__full__:${version}` key made
+    // the first full document's validator get reused for every later full
+    // document of the same version, so any section absent from the first
+    // document was flagged as a false-positive additionalProperties error
+    // (DOC-1628). Sort so key order within a document does not spawn duplicate
+    // cache entries.
+    const sectionSetKey = [...matchingSections].sort().join(',');
+    cacheKey = `__full__:${sectionSetKey}:${version}`;
 
     // Build schema with only the sections present in the snippet
     const snippetSchema: JsonSchema = {
