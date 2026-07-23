@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.5.1] - 2026-07-23
 
 ### Fixed
 - `validate-config`: full-document validation no longer reports false-positive `additionalProperties` errors on valid multi-section `vcluster.yaml` files. Compiled full-document validators were cached under a key that ignored which top-level sections the document contained, so the first document validated in a process fixed the allowed section set for every later document of the same version (DOC-1628).
