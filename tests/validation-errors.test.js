@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { validateSnippet } from '../src/snippet-validator.ts';
+import { validateSnippet, clearCache } from '../src/snippet-validator.ts';
 import { githubClient } from '../src/github.ts';
 
 describe('Validation Error Detection', () => {
@@ -281,6 +281,120 @@ controlPlane:
         e.keyword === 'additionalProperties'
       );
       expect(hasAdditionalPropsError).toBe(true);
+    });
+  });
+
+  // DOC-1628: full-document validators were cached under a fixed
+  // `__full__:<version>` key that ignored which top-level sections the
+  // document contained. The first full document validated in a process
+  // therefore poisoned the cache for every later full document of the same
+  // version: any section absent from the first document was reported as a
+  // false-positive additionalProperties error. The failure is order-dependent
+  // across validate() calls, which is why it only appears once more than one
+  // multi-section document is validated in the same session.
+  describe('Multi-key document order-independence (DOC-1628)', () => {
+    // Two valid full documents whose top-level section sets differ.
+    const docControlPlaneExport = `
+controlPlane:
+  proxy:
+    extraSANs:
+      - "vcluster-demo.vcluster-demo.svc.cluster.local"
+exportKubeConfig:
+  server: https://vcluster-name.vcluster-namespace.svc.cluster.local:443
+  insecure: true
+  additionalSecrets:
+  - name: vcluster-flux-kubeconfig
+`;
+    const docControlPlaneSync = `
+controlPlane:
+  backingStore:
+    etcd:
+      embedded:
+        enabled: true
+  ingress:
+    enabled: true
+    host: vcluster-k8s-api.example.com
+sync:
+  toHost:
+    serviceAccounts:
+      enabled: true
+`;
+
+    it('does not flag a valid section absent from the previously validated document', () => {
+      clearCache();
+
+      // Prime the cache with a document that has no `sync` section.
+      const first = validateSnippet(docControlPlaneExport, fullSchema, version);
+      expect(first.valid).toBe(true);
+
+      // Before the fix this reused the primed validator and reported
+      // additionalProperty: sync even though `sync` is a valid top-level key.
+      const second = validateSnippet(docControlPlaneSync, fullSchema, version);
+      expect(second.section).toBe('__full_document__');
+      expect(second.errors ?? []).toEqual([]);
+      expect(second.valid).toBe(true);
+    });
+
+    it('is symmetric under reversed validation order', () => {
+      clearCache();
+
+      // Prime with a document that has no `exportKubeConfig` section.
+      const first = validateSnippet(docControlPlaneSync, fullSchema, version);
+      expect(first.valid).toBe(true);
+
+      const second = validateSnippet(docControlPlaneExport, fullSchema, version);
+      expect(second.section).toBe('__full_document__');
+      expect(second.errors ?? []).toEqual([]);
+      expect(second.valid).toBe(true);
+    });
+
+    it('reproduces the issue backingStore + ingress + sync case after a differing full document', () => {
+      clearCache();
+
+      // A different multi-section document primes the cache first.
+      validateSnippet(docControlPlaneExport, fullSchema, version);
+
+      const yaml = `
+controlPlane:
+  backingStore:
+    etcd:
+      embedded:
+        enabled: true
+  ingress:
+    enabled: true
+    host: vcluster-k8s-api.example.com
+sync:
+  toHost:
+    serviceAccounts:
+      enabled: true
+`;
+      const result = validateSnippet(yaml, fullSchema, version);
+      expect(result.valid).toBe(true);
+      expect(result.errors ?? []).toEqual([]);
+    });
+
+    it('still flags genuinely invalid top-level keys after a valid full document primes the cache', () => {
+      clearCache();
+
+      // Prime with a valid full document.
+      const primed = validateSnippet(docControlPlaneSync, fullSchema, version);
+      expect(primed.valid).toBe(true);
+
+      // A real typo at the top level must still be rejected: the fix must not
+      // make additionalProperties detection permissive.
+      const yaml = `
+controlPlane:
+  distro:
+    k3s:
+      enabled: true
+totallyBogusTopLevelKey: true
+`;
+      const result = validateSnippet(yaml, fullSchema, version);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e =>
+        e.keyword === 'additionalProperties' &&
+        e.params.additionalProperty === 'totallyBogusTopLevelKey'
+      )).toBe(true);
     });
   });
 });
